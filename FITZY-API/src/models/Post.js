@@ -1,0 +1,2 @@
+const mongoose = require('mongoose');
+module.exports = mongoose.model('Post', new mongoose.Schema({ title: { type: String, required: true, trim: true }, slug: { type: String, required: true, unique: true }, excerpt: { type: String, default: '' }, content: { type: String, required: true }, image: { type: String, default: '' }, status: { type: String, enum: ['draft', 'published'], default: 'draft', index: true }, publishedAt: Date }, { timestamps: true }));

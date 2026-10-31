@@ -1,0 +1,16 @@
+import React, { useState } from 'react';
+import { Image, Pressable, Text, View } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { askStylist } from '../../store/slices/aiSlice';
+import { Button, Field, Page } from '../../components/ui';
+import { theme, formatVnd } from '../../constants/theme';
+
+export default function StylistScreen({ navigation }) {
+  const dispatch = useDispatch(); const user = useSelector(state => state.auth.user); const { answer, status, error } = useSelector(state => state.ai); const [occasion, setOccasion] = useState('Đi làm'); const [style, setStyle] = useState('Tối giản'); const [colors, setColors] = useState('Trung tính'); const [size, setSize] = useState('M'); const [budget, setBudget] = useState('1000000'); const [notes, setNotes] = useState('');
+  if (!user) return <Page><Text style={{ color: theme.colors.muted, lineHeight: 23 }}>FITZY Stylist đề xuất trang phục có sẵn trong cửa hàng theo dịp, phong cách, size và ngân sách.</Text><Button title="Đăng nhập để tư vấn" onPress={() => navigation.navigate('Auth')} /></Page>;
+  const suggest = () => dispatch(askStylist({ occasion, style, colors, size, budget: Number(budget), notes }));
+  return <Page><View style={{ padding: 20, borderRadius: 20, backgroundColor: theme.colors.ink, gap: 8 }}><Text style={{ color: '#d8c2a5', letterSpacing: 1 }}>FITZY AI STYLIST</Text><Text style={{ color: '#fff', fontSize: 23, fontWeight: '800' }}>Một gợi ý hợp gu bạn.</Text><Text style={{ color: '#d3d0ca', lineHeight: 21 }}>Tư vấn dựa trên trang phục FITZY đang còn hàng.</Text></View>
+    <Field label="Dịp sử dụng" value={occasion} onChangeText={setOccasion} placeholder="Đi học, đi làm, đi chơi, dự tiệc" /><Field label="Phong cách" value={style} onChangeText={setStyle} placeholder="Tối giản, streetwear, casual..." /><Field label="Màu yêu thích" value={colors} onChangeText={setColors} placeholder="Đen, trắng, be..." /><Field label="Size" value={size} onChangeText={setSize} placeholder="M, L..." /><Field label="Ngân sách tối đa (VND)" value={budget} onChangeText={setBudget} keyboardType="numeric" /><Field label="Ghi chú" value={notes} onChangeText={setNotes} placeholder="Yêu cầu thêm" multiline />{error ? <Text style={{ color: theme.colors.danger }}>{error}</Text> : null}<Button title="Nhận tư vấn" loading={status === 'loading'} onPress={suggest} />
+    {answer ? <View style={{ gap: 14 }}><Text style={{ color: theme.colors.ink, fontSize: 17, lineHeight: 24 }}>{answer.advice}</Text>{answer.products.map(product => <Pressable key={product._id} onPress={() => navigation.navigate('Product', { id: product._id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 16, padding: 10 }}>{product.images?.[0] ? <Image source={{ uri: product.images[0] }} style={{ width: 70, height: 85, borderRadius: 12 }} /> : null}<View style={{ flex: 1, gap: 6 }}><Text style={{ color: theme.colors.ink, fontWeight: '700' }}>{product.name}</Text><Text style={{ color: theme.colors.accent }}>{formatVnd(product.price)}</Text><Text style={{ color: theme.colors.muted }}>Xem sản phẩm →</Text></View></Pressable>)}{!answer.products.length ? <Text style={{ color: theme.colors.muted }}>Chưa tìm thấy sản phẩm còn hàng trong ngân sách và size này.</Text> : null}</View> : null}
+  </Page>;
+}

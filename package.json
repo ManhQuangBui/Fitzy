@@ -1,0 +1,17 @@
+{
+  "name": "fitzy-commerce",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["FITZY-API", "FITZY-Mobile", "FITZY-Admin"],
+  "scripts": {
+    "api": "npm run dev --workspace fitzy-api",
+    "admin": "npm run dev --workspace fitzy-admin",
+    "mobile": "npm run start --workspace fitzy-mobile",
+    "mobile:clear": "npm --prefix FITZY-Mobile run start -- --clear",
+    "test": "npm test --workspace fitzy-api",
+    "lint": "npm run lint --workspaces --if-present",
+    "build:admin": "npm run build --workspace fitzy-admin",
+    "build:mobile": "npm run export --workspace fitzy-mobile"
+  },
+  "devDependencies": { "@babel/parser": "^7.28.4" }
+}

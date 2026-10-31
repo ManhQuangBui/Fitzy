@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "681936412866",
+    "project_id": "fitzy-d7805",
+    "storage_bucket": "fitzy-d7805.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681936412866:android:26eb83fab8195c69129b5b",
+        "android_client_info": {
+          "package_name": "com.fitzy.store"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDpccb7s_C7mRTMuGbhZJSTLxm7ZnqC2q8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
