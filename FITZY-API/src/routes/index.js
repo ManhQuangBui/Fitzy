@@ -84,6 +84,7 @@ router.patch('/users/:id/block', admin, [body('isBlocked').isBoolean()], validat
 router.patch('/orders/:id/status', admin, [param('id').isMongoId(), body('status').isIn(['pending', 'confirmed', 'preparing', 'shipping', 'completed', 'cancelled', 'delivery_failed']), body('note').optional().isString().trim().isLength({ max: 500 })], validate, resources.changeAdminOrderStatus);
 router.get('/reviews/admin/list', admin, resources.adminReviews);
 router.patch('/reviews/:id/moderate', admin, [body('status').isIn(['visible', 'hidden'])], validate, resources.moderateReview);
+router.patch('/reviews/:id/reply', admin, [param('id').isMongoId(), body('reply').optional().isString().isLength({ max: 1200 })], validate, resources.replyReview);
 router.get('/stats', admin, resources.stats);
 router.get('/admin/products/:id/activity', admin, [param('id').isMongoId()], validate, resources.productActivity);
 

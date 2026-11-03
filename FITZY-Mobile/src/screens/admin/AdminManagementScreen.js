@@ -195,9 +195,10 @@ export default function AdminManagementScreen({ route }) {
   const kind = route.params?.kind || 'products'; const config = resource[kind] || resource.products;
   const [page, setPage] = useState(1); const [queryDraft, setQueryDraft] = useState(''); const [query, setQuery] = useState(''); const [status, setStatus] = useState(''); const [rating, setRating] = useState(''); const [product, setProduct] = useState(''); const [fromDraft, setFromDraft] = useState(''); const [toDraft, setToDraft] = useState(''); const [from, setFrom] = useState(''); const [to, setTo] = useState('');
   const [list, setList] = useState({ items: [], pagination: null, loading: true, error: '' }); const [attempt, setAttempt] = useState(0); const [categories, setCategories] = useState([]); const [products, setProducts] = useState([]); const [editor, setEditor] = useState(undefined); const [detail, setDetail] = useState(null); const [notice, setNotice] = useState('');
+  const [replyTarget, setReplyTarget] = useState(null); const [replyText, setReplyText] = useState(''); const [replyBusy, setReplyBusy] = useState(false);
   const params = useMemo(() => ({ page, limit: pageLimit, ...(query ? { q: query } : {}), ...(status && ['products', 'categories', 'posts'].includes(kind) ? { status } : {}), ...(kind === 'products' && status ? { status } : {}), ...(kind === 'orders' && status ? { status } : {}), ...(kind === 'products' && product ? { category: product } : {}), ...(kind === 'reviews' && rating ? { rating } : {}), ...(kind === 'reviews' && product ? { product } : {}), ...(kind === 'orders' && from ? { from } : {}), ...(kind === 'orders' && to ? { to } : {}) }), [page, query, status, kind, product, rating, from, to]);
 
-  useEffect(() => { setPage(1); setQueryDraft(''); setQuery(''); setStatus(''); setRating(''); setProduct(''); setFromDraft(''); setToDraft(''); setFrom(''); setTo(''); setEditor(undefined); setDetail(null); setNotice(''); }, [kind]);
+  useEffect(() => { setPage(1); setQueryDraft(''); setQuery(''); setStatus(''); setRating(''); setProduct(''); setFromDraft(''); setToDraft(''); setFrom(''); setTo(''); setEditor(undefined); setDetail(null); setNotice(''); setReplyTarget(null); setReplyText(''); }, [kind]);
 
   useEffect(() => {
     let active = true; setList(current => ({ ...current, loading: true, error: '' }));
@@ -233,6 +234,25 @@ export default function AdminManagementScreen({ route }) {
     { text: 'Hủy', style: 'cancel' },
     { text: kind === 'products' ? 'Ẩn sản phẩm' : 'Xóa', style: 'destructive', onPress: async () => { try { await api.delete(`${config.path}/${row._id}`); setNotice(kind === 'products' ? 'Đã ẩn sản phẩm.' : kind === 'promotions' && row.usedCount ? 'Mã đã dùng; đã vô hiệu hóa.' : 'Đã xóa.'); reload(); } catch (error) { setNotice(error.message); } } }
   ]);
+  const openReply = row => {
+    setReplyTarget(row);
+    setReplyText(row.adminReply || '');
+  };
+  const saveReply = async customText => {
+    if (!replyTarget) return;
+    setReplyBusy(true);
+    try {
+      const text = customText !== undefined ? customText : replyText;
+      await api.patch(`/reviews/${replyTarget._id}/reply`, { reply: text.trim() });
+      setNotice(text.trim() ? 'Đã lưu phản hồi đánh giá.' : 'Đã xóa phản hồi.');
+      setReplyTarget(null);
+      reload();
+    } catch (error) {
+      Alert.alert('Lỗi', error.message);
+    } finally {
+      setReplyBusy(false);
+    }
+  };
 
   const rows = list.items.map(row => {
     const productCategory = row.category?.name || categories.find(item => item._id === row.category)?.name;
@@ -292,11 +312,20 @@ export default function AdminManagementScreen({ route }) {
         <View style={{ flex: 1, gap: 5 }}><Text selectable style={{ color: theme.colors.ink, fontWeight: '800', fontSize: 15 }}>{rowTitle}</Text><Text selectable style={{ color: theme.colors.muted, fontSize: 12, lineHeight: 18 }}>{subtitle}</Text></View>
         {badge ? <Text style={{ alignSelf: 'flex-start', color: badge === 'hidden' || badge === 'blocked' || badge === 'cancelled' ? theme.colors.danger : theme.colors.success, fontSize: 10, fontWeight: '700' }}>{statusLabel[badge] || badge}</Text> : null}
       </View>
-      {kind === 'reviews' ? <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Bình luận: {row.comment || 'Không có bình luận'}</Text> : null}
+      {kind === 'reviews' ? <View style={{ gap: 6 }}>
+        <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Bình luận: {row.comment || 'Không có bình luận'}</Text>
+        {row.adminReply ? <View style={{ padding: 10, borderRadius: 10, backgroundColor: theme.colors.paper, borderLeftWidth: 3, borderLeftColor: theme.colors.accent, gap: 2 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.ink }}>↳ FITZY phản hồi:</Text>
+          <Text style={{ fontSize: 12, color: theme.colors.ink, lineHeight: 17 }}>{row.adminReply}</Text>
+        </View> : null}
+      </View> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
         {kind === 'orders' || kind === 'customers' ? <Button title="Chi tiết" variant="light" onPress={() => setDetail(row)} style={{ minHeight: 40, flexGrow: 1 }} /> : null}
         {kind === 'customers' ? <Button title={row.isBlocked ? 'Mở khóa' : 'Khóa tài khoản'} variant="light" onPress={() => toggleCustomer(row)} style={{ minHeight: 40, flexGrow: 1 }} /> : null}
-        {kind === 'reviews' ? <Button title={row.status === 'visible' ? 'Ẩn đánh giá' : 'Hiện đánh giá'} variant="light" onPress={() => toggleReview(row)} style={{ minHeight: 40, flexGrow: 1 }} /> : null}
+        {kind === 'reviews' ? <>
+          <Button title={row.adminReply ? 'Sửa phản hồi' : 'Phản hồi'} variant="light" onPress={() => openReply(row)} style={{ minHeight: 40, flexGrow: 1 }} />
+          <Button title={row.status === 'visible' ? 'Ẩn đánh giá' : 'Hiện đánh giá'} variant="light" onPress={() => toggleReview(row)} style={{ minHeight: 40, flexGrow: 1 }} />
+        </> : null}
         {config.editable ? <Button title="Sửa" variant="light" onPress={() => setEditor(row)} style={{ minHeight: 40, flexGrow: 1 }} /> : null}
         {config.editable ? <Button title={kind === 'products' ? 'Ẩn' : 'Xóa'} variant="light" onPress={() => remove(row)} style={{ minHeight: 40, flexGrow: 1 }} /> : null}
       </View>
@@ -308,5 +337,32 @@ export default function AdminManagementScreen({ route }) {
     </View> : null}
     {editor !== undefined ? <Editor kind={kind} item={editor || null} categories={categories} onClose={() => setEditor(undefined)} onSave={save} /> : null}
     {detail ? <DetailModal kind={kind} record={detail} onClose={() => setDetail(null)} onStatus={updateOrder} /> : null}
+    {replyTarget ? <Modal visible transparent animationType="slide" onRequestClose={() => setReplyTarget(null)}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+        <View style={{ maxHeight: '85%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: theme.colors.paper, padding: 18, gap: 14 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>PHẢN HỒI ĐÁNH GIÁ</Text>
+              <Text style={{ color: theme.colors.ink, fontSize: 18, fontWeight: '800' }}>{replyTarget.product?.name || 'Sản phẩm'}</Text>
+            </View>
+            <Pressable onPress={() => setReplyTarget(null)}><Text style={{ color: theme.colors.muted, fontSize: 26, paddingHorizontal: 6 }}>×</Text></Pressable>
+          </View>
+          <View style={{ padding: 12, borderRadius: 12, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.line, gap: 4 }}>
+            <Text style={{ fontWeight: '700', color: theme.colors.ink, fontSize: 13 }}>{replyTarget.user?.name || 'Khách hàng'} · {'★'.repeat(replyTarget.rating)}</Text>
+            <Text style={{ color: theme.colors.muted, fontSize: 13, fontStyle: 'italic' }}>"{replyTarget.comment || 'Không có nhận xét'}"</Text>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: theme.colors.ink, fontWeight: '700', fontSize: 13 }}>Câu trả lời của FITZY Store:</Text>
+            <TextInput value={replyText} onChangeText={setReplyText} placeholder="Nhập câu trả lời gửi đến khách hàng..." multiline numberOfLines={4} maxLength={1200} style={{ minHeight: 90, padding: 12, borderRadius: 12, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.line, textAlignVertical: 'top', fontSize: 14, color: theme.colors.ink }} />
+            <Text style={{ alignSelf: 'flex-end', color: theme.colors.muted, fontSize: 11 }}>{replyText.length}/1200</Text>
+          </View>
+          <View style={{ gap: 8, paddingBottom: 16 }}>
+            <Button title={replyBusy ? 'Đang lưu…' : 'Gửi phản hồi'} loading={replyBusy} disabled={!replyText.trim()} onPress={() => saveReply()} />
+            {replyTarget.adminReply ? <Button title="Xóa phản hồi hiện tại" variant="light" disabled={replyBusy} onPress={() => saveReply('')} /> : null}
+            <Button title="Đóng" variant="light" disabled={replyBusy} onPress={() => setReplyTarget(null)} />
+          </View>
+        </View>
+      </View>
+    </Modal> : null}
   </Page>;
 }

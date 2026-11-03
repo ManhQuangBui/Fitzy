@@ -229,14 +229,113 @@ const ownReviewUpdate = asyncHandler(async (req, res) => {
 });
 const ownReviewDelete = asyncHandler(async (req, res) => { const result = await Review.deleteOne({ _id: req.params.id, user: req.user.id }); if (!result.deletedCount) throw new AppError('Review not found', 404, 'NOT_FOUND'); res.json({ success: true, data: { message: 'Review deleted' } }); });
 
+
 const adminReviews = asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Number(req.query.limit) || 20); const filter = {};
-  if (req.query.rating) filter.rating = Number(req.query.rating); if (req.query.product) filter.product = req.query.product; if (req.query.status) filter.status = req.query.status;
-  const [items, total] = await Promise.all([Review.find(filter).populate('user', 'name email').populate('product', 'name').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), Review.countDocuments(filter)]);
-  res.json({ success: true, data: pageResult(items, total, page, limit) });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 20);
+    const filter = {};
+
+
+    if (req.query.q) {
+        const safeQ = String(req.query.q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const matchingUsers = await User.find({
+            $or: [
+                { name: { $regex: safeQ, $options: 'i' } },
+                { email: { $regex: safeQ, $options: 'i' } }
+            ]
+        }).select('_id').lean();
+        const userIds = matchingUsers.map(u => u._id);
+
+        filter.$or = [
+            { comment: { $regex: safeQ, $options: 'i' } },
+            { user: { $in: userIds } }
+        ];
+    }
+
+
+    if (req.query.rating) {
+        filter.rating = Number(req.query.rating);
+    }
+
+
+    if (req.query.product) {
+        filter.product = req.query.product;
+    }
+
+
+    if (req.query.status && ['visible', 'hidden'].includes(req.query.status)) {
+        filter.status = req.query.status;
+    }
+
+
+    const summaryFilter = {};
+    if (req.query.product && mongoose.Types.ObjectId.isValid(req.query.product)) {
+        summaryFilter.product = new mongoose.Types.ObjectId(req.query.product);
+    }
+
+    const [items, total, stats] = await Promise.all([
+        Review.find(filter)
+            .populate('user', 'name email')
+            .populate('product', 'name')
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit),
+        Review.countDocuments(filter),
+        Review.aggregate([
+            { $match: summaryFilter },
+            {
+                $group: {
+                    _id: null,
+                    avgRating: { $avg: '$rating' },
+                    total: { $sum: 1 },
+                    visibleCount: { $sum: { $cond: [{ $eq: ['$status', 'visible'] }, 1, 0] } },
+                    hiddenCount: { $sum: { $cond: [{ $eq: ['$status', 'hidden'] }, 1, 0] } }
+                }
+            }
+        ])
+    ]);
+
+    const summary = stats[0]
+        ? {
+            avgRating: Math.round(stats[0].avgRating * 10) / 10,
+            total: stats[0].total,
+            visibleCount: stats[0].visibleCount,
+            hiddenCount: stats[0].hiddenCount
+        }
+        : {
+            avgRating: 0,
+            total: 0,
+            visibleCount: 0,
+            hiddenCount: 0
+        };
+
+    res.json({
+        success: true,
+        data: {
+            ...pageResult(items, total, page, limit),
+            summary
+        }
+    });
 });
+
 const moderateReview = asyncHandler(async (req, res) => {
   const review = await Review.findByIdAndUpdate(req.params.id, { $set: { status: req.body.status } }, { new: true, runValidators: true });
+  if (!review) throw new AppError('Review not found', 404, 'NOT_FOUND');
+  res.json({ success: true, data: { review } });
+});
+
+const replyReview = asyncHandler(async (req, res) => {
+  const reply = typeof req.body.reply === 'string' ? req.body.reply.trim() : '';
+  const review = await Review.findByIdAndUpdate(
+    req.params.id,
+    {
+      $set: {
+        adminReply: reply,
+        repliedAt: reply ? new Date() : null
+      }
+    },
+    { new: true, runValidators: true }
+  ).populate('user', 'name email').populate('product', 'name');
   if (!review) throw new AppError('Review not found', 404, 'NOT_FOUND');
   res.json({ success: true, data: { review } });
 });
@@ -292,29 +391,58 @@ const customers = asyncHandler(async (req, res) => {
 const customerDetail = asyncHandler(async (req, res) => {
   const user = await User.findOne({ _id: req.params.id, role: 'customer' }).select('-passwordHash');
   if (!user) throw new AppError('Customer not found', 404, 'NOT_FOUND');
-    const [orderCount, spent, recentOrders] = await Promise.all([
-        Order.countDocuments({ user: user._id }),
-        Order.aggregate([{ $match: { user: user._id, status: { $ne: 'cancelled' } } }, { $group: { _id: null, total: { $sum: '$total' } } }]),
-        Order.find({ user: user._id }).lean().sort({ createdAt: -1 }).limit(3).select('orderNumber total status createdAt')
-    ]);
-    res.json({ success: true, data: { user, orderCount, spent: spent[0]?.total || 0, recentOrders } });
-});
-const blockCustomer = asyncHandler(async (req, res) => {
-    const isBlocked = Boolean(req.body.isBlocked);
-    const update = { isBlocked };
-
-    if (isBlocked) {
-        update.blockReason = req.body.blockReason ? String(req.body.blockReason).trim() : 'Vi phạm chính sách';
-    } else {
-        update.blockReason = '';
+  const [orderCount, spent, recentOrders, activeOrders] = await Promise.all([
+    Order.countDocuments({ user: user._id }),
+    Order.aggregate([{ $match: { user: user._id, status: { $ne: 'cancelled' } } }, { $group: { _id: null, total: { $sum: '$total' } } }]),
+    Order.find({ user: user._id }).lean().sort({ createdAt: -1 }).limit(3).select('orderNumber total status createdAt'),
+    Order.find({ user: user._id, status: { $in: ['pending', 'confirmed', 'preparing', 'shipping'] } }).select('orderNumber status')
+  ]);
+  res.json({
+    success: true,
+    data: {
+      user,
+      orderCount,
+      spent: spent[0]?.total || 0,
+      recentOrders,
+      activeOrders,
+      pendingOrderCount: activeOrders.length
     }
-    const user = await User.findOneAndUpdate(
-        { _id: req.params.id, role: 'customer' },
-        { $set: update },
-        { new: true }
-    ).select('-passwordHash');
-    if (!user) throw new AppError('Customer not found', 404, 'NOT_FOUND');
-    res.json({ success: true, data: { user } });
+  });
+});
+
+const blockCustomer = asyncHandler(async (req, res) => {
+  const isBlocked = Boolean(req.body.isBlocked);
+  const update = { isBlocked };
+
+  if (isBlocked) {
+    const activeOrders = await Order.find({
+      user: req.params.id,
+      status: { $in: ['pending', 'confirmed', 'preparing', 'shipping'] }
+    }).select('orderNumber status');
+
+    if (activeOrders.length > 0) {
+      const orderCodes = activeOrders.map(o => o.orderNumber).join(', ');
+      throw new AppError(
+        `Không thể khóa tài khoản: Khách hàng đang có ${activeOrders.length} đơn hàng chưa hoàn tất (${orderCodes}). Vui lòng xử lý các đơn hàng này trước!`,
+        409,
+        'ACTIVE_ORDERS_EXIST'
+      );
+    }
+
+    update.blockReason = req.body.blockReason ? String(req.body.blockReason).trim() : 'Vi phạm chính sách';
+    update.blockedAt = new Date();
+  } else {
+    update.blockReason = '';
+  }
+
+  const user = await User.findOneAndUpdate(
+    { _id: req.params.id, role: 'customer' },
+    { $set: update },
+    { new: true }
+  ).select('-passwordHash');
+
+  if (!user) throw new AppError('Customer not found', 404, 'NOT_FOUND');
+  res.json({ success: true, data: { user } });
 });
 
 const adminOrders = asyncHandler(async (req, res) => {
@@ -340,4 +468,4 @@ const stats = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { revenue: revenue[0]?.total || 0, orderCount: orders, customerCount: customers, productCount: products, chart: daily, topProducts } });
 });
 
-module.exports = { definitions, adminList, adminCreate, adminUpdate, adminDelete, productActivity, publicCategories, publicPosts, publicPostDetail, favoritesList, favoriteAdd, favoriteRemove, createReview, ownReviewUpdate, ownReviewDelete, adminReviews, moderateReview, customers, customerDetail, blockCustomer, adminOrders, changeAdminOrderStatus, stats };
+module.exports = { definitions, adminList, adminCreate, adminUpdate, adminDelete, productActivity, publicCategories, publicPosts, publicPostDetail, favoritesList, favoriteAdd, favoriteRemove, createReview, ownReviewUpdate, ownReviewDelete, adminReviews, moderateReview, replyReview, customers, customerDetail, blockCustomer, adminOrders, changeAdminOrderStatus, stats };
