@@ -1,4 +1,5 @@
 const Product = require('../../models/Product');
+const Category = require('../../models/Category');
 
 const model = () => process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const clean = value => String(value || '').trim().slice(0, 300);
@@ -25,7 +26,7 @@ async function advise(input) {
   catch { result = { advice: 'FITZY Stylist đang dùng gợi ý theo danh mục có sẵn. Những lựa chọn dưới đây được lấy trực tiếp từ cửa hàng.', keywords: [input.occasion, input.style, input.colors].filter(Boolean) }; }
   const size = clean(input.size);
   const budget = Number(input.budget) > 0 ? Number(input.budget) : Number.MAX_SAFE_INTEGER;
-  const filter = { status: 'active', price: { $lte: budget }, variants: { $elemMatch: { isActive: true, quantity: { $gt: 0 }, ...(size ? { size: new RegExp(`^${escapeRegExp(size)}$`, 'i') } : {}) } } };
+  const filter = { status: 'active', category: { $in: await Category.activeIds() }, price: { $lte: budget }, variants: { $elemMatch: { isActive: true, quantity: { $gt: 0 }, ...(size ? { size: new RegExp(`^${escapeRegExp(size)}$`, 'i') } : {}) } } };
   let products = await Product.find(filter).populate('category', 'name slug').sort({ featured: -1, salesCount: -1 }).limit(20);
   const tokens = result.keywords.map(value => value.toLowerCase()).filter(Boolean);
   if (tokens.length && products.length) {

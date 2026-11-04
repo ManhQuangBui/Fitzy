@@ -208,6 +208,73 @@ test('admin category CRUD and image upload enforce access and file constraints',
   assert.equal((await request(app).delete(`/api/admin/categories/${category.body.data.item._id}`).set(headers)).status, 200);
 });
 
+test('hiding a category hides its products from customers and blocks ordering them', async () => {
+  const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const headers = { Authorization: `Bearer ${adminToken}` };
+  const category = await mongoose.model('Category').create({ name: 'Visibility shirts', slug: 'visibility-shirts' });
+  const item = await mongoose.model('Product').create({ name: 'Visibility tee', slug: 'visibility-tee', category: category._id, price: 100000, status: 'active', variants: [{ size: 'M', color: 'Black', quantity: 5 }] });
+  const listed = async () => (await request(app).get('/api/products?limit=48')).body.data.items.some(entry => entry._id === item.id);
+  const placeOrder = () => request(app).post('/api/orders').set('Authorization', `Bearer ${customerToken}`).send({
+    items: [{ productId: item.id, variantId: item.variants[0].id, quantity: 1 }], paymentMethod: 'cod',
+    shipping: { recipient: 'Test Buyer', phone: '0912345678', line1: '12 Test Street', district: 'District 1', city: 'Ho Chi Minh City' }
+  });
+  assert.equal(await listed(), true);
+  assert.equal((await request(app).get(`/api/products/${item.id}`)).status, 200);
+
+  assert.equal((await request(app).patch(`/api/admin/categories/${category.id}`).set(headers).send({ status: 'hidden' })).status, 200);
+  assert.equal(await listed(), false);
+  assert.equal((await request(app).get(`/api/products/${item.id}`)).status, 404);
+  const blocked = await placeOrder();
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.error.code, 'PRODUCT_UNAVAILABLE');
+
+  assert.equal((await request(app).patch(`/api/admin/categories/${category.id}`).set(headers).send({ status: 'active' })).status, 200);
+  assert.equal(await listed(), true);
+  assert.equal((await request(app).get(`/api/products/${item.id}`)).status, 200);
+});
+
+test('category admin API validates input, rejects duplicates, protects used categories and reports product counts', async () => {
+  const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const headers = { Authorization: `Bearer ${adminToken}` };
+  const create = body => request(app).post('/api/admin/categories').set(headers).send(body);
+  const first = await create({ name: 'Áo khoác', status: 'active' });
+  assert.equal(first.status, 201);
+  const firstId = first.body.data.item._id;
+
+  for (const name of ['Áo khoác', 'Ao khoac']) {
+    const duplicate = await create({ name });
+    assert.equal(duplicate.status, 409);
+    assert.equal(duplicate.body.error.code, 'CATEGORY_DUPLICATE');
+  }
+  for (const body of [{ name: '' }, { name: '   ' }, { name: 'x'.repeat(81) }, { name: 'Valid name', status: 'archived' }, { name: 'Valid name', image: 'javascript:alert(1)' }, { name: 'Valid name', description: 'x'.repeat(501) }]) {
+    const rejected = await create(body);
+    assert.equal(rejected.status, 400, JSON.stringify(body).slice(0, 60));
+    assert.equal(rejected.body.error.code, 'INVALID_CATEGORY');
+  }
+
+  const second = await create({ name: 'Quần jean' });
+  assert.equal(second.status, 201);
+  const secondId = second.body.data.item._id;
+  const renamedToDuplicate = await request(app).patch(`/api/admin/categories/${secondId}`).set(headers).send({ name: 'Ao khoac' });
+  assert.equal(renamedToDuplicate.status, 409);
+  assert.equal((await request(app).patch(`/api/admin/categories/${firstId}`).set(headers).send({ name: 'Áo khoác', description: 'Same name keeps working' })).status, 200);
+
+  await mongoose.model('Product').create({ name: 'Count tee', slug: 'count-tee', category: firstId, price: 100000, status: 'hidden', variants: [{ size: 'M', color: 'Black', quantity: 1 }] });
+  const inUse = await request(app).delete(`/api/admin/categories/${firstId}`).set(headers);
+  assert.equal(inUse.status, 409);
+  assert.equal(inUse.body.error.code, 'CATEGORY_IN_USE');
+
+  const all = (await request(app).get('/api/admin/categories?limit=100').set(headers)).body.data.items;
+  assert.equal(all.find(entry => entry._id === firstId).productCount, 1);
+  assert.equal(all.find(entry => entry._id === secondId).productCount, 0);
+
+  assert.equal((await request(app).patch(`/api/admin/categories/${secondId}`).set(headers).send({ status: 'hidden' })).status, 200);
+  const hidden = (await request(app).get('/api/admin/categories?status=hidden&limit=100').set(headers)).body.data.items;
+  assert.ok(hidden.some(entry => entry._id === secondId));
+  assert.ok(hidden.every(entry => entry.status === 'hidden'));
+  assert.equal((await request(app).delete(`/api/admin/categories/${secondId}`).set(headers)).status, 200);
+});
+
 test('bank transfer is listed when configured and can be confirmed by an admin', async () => {
   const methods = await request(app).get('/api/payments/methods');
   assert.equal(methods.status, 200);

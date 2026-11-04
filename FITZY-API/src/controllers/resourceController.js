@@ -39,9 +39,26 @@ function adminList(kind) {
     }
     let query = Model.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
     if (kind === 'products') query = query.populate('category', 'name slug');
-    const [items, total] = await Promise.all([query, Model.countDocuments(filter)]);
+    const [found, total] = await Promise.all([query, Model.countDocuments(filter)]);
+    const items = kind === 'categories' ? await withProductCounts(found) : found;
     res.json({ success: true, data: pageResult(items, total, page, limit) });
   });
+}
+
+// Counts every product (hidden included), matching the rule that blocks deleting a category in use.
+async function withProductCounts(categories) {
+  const rows = await Product.aggregate([{ $match: { category: { $in: categories.map(item => item._id) } } }, { $group: { _id: '$category', count: { $sum: 1 } } }]);
+  const counts = new Map(rows.map(row => [String(row._id), row.count]));
+  return categories.map(item => ({ ...item.toObject(), productCount: counts.get(String(item._id)) || 0 }));
+}
+
+async function validateCategoryData(data, id) {
+  const invalid = message => new AppError(message, 400, 'INVALID_CATEGORY');
+  if ((!id || 'name' in data) && (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 80)) throw invalid('Category name is required and must be at most 80 characters');
+  if ('description' in data && (typeof data.description !== 'string' || data.description.length > 500)) throw invalid('Description must be at most 500 characters');
+  if (data.image && (typeof data.image !== 'string' || data.image.length > 2048 || !/^https?:\/\//i.test(data.image))) throw invalid('Image must be an http(s) URL');
+  if ('status' in data && !['active', 'hidden'].includes(data.status)) throw invalid('Invalid category status');
+  if (data.slug && await Category.exists({ slug: data.slug, ...(id ? { _id: { $ne: id } } : {}) })) throw new AppError('Tên danh mục đã tồn tại', 409, 'CATEGORY_DUPLICATE');
 }
 
 function adminCreate(kind) {
@@ -51,6 +68,7 @@ function adminCreate(kind) {
     if (definition.uniqueSlug) data.slug = slugBase(req.body.slug || req.body[definition.slugField || 'name']);
     if (kind === 'posts' && data.status === 'published' && !data.publishedAt) data.publishedAt = new Date();
     if (kind === 'products') await validateProductData(data);
+    if (kind === 'categories') await validateCategoryData(data);
     const item = await definition.Model.create(data);
     if (kind === 'products') await writeProductActivities(item, req.user.id, [
       { action: 'created', changes: [{ field: 'product', after: { name: item.name, price: item.price, category: item.category, status: item.status } }] },
@@ -67,6 +85,7 @@ function adminUpdate(kind) {
     if (definition.uniqueSlug && (req.body.slug || req.body[definition.slugField || 'name'])) update.slug = slugBase(req.body.slug || req.body[definition.slugField || 'name']);
     if (kind === 'posts' && update.status === 'published' && !update.publishedAt) update.publishedAt = new Date();
     let item;
+    if (kind === 'categories') await validateCategoryData(update, req.params.id);
     if (kind === 'products') {
       const current = await Product.findById(req.params.id);
       if (!current) throw new AppError('Record not found', 404, 'NOT_FOUND');
@@ -207,7 +226,7 @@ const publicPostDetail = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { item } });
 });
 
-const favoritesList = asyncHandler(async (req, res) => res.json({ success: true, data: { items: await Favorite.find({ user: req.user.id }).populate({ path: 'product', match: { status: 'active' }, populate: { path: 'category', select: 'name slug' } }) } }));
+const favoritesList = asyncHandler(async (req, res) => res.json({ success: true, data: { items: await Favorite.find({ user: req.user.id }).populate({ path: 'product', match: { status: 'active', category: { $in: await Category.activeIds() } }, populate: { path: 'category', select: 'name slug' } }) } }));
 const favoriteAdd = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.productId)) throw new AppError('Invalid product id', 400, 'INVALID_ID');
   if (!await Product.exists({ _id: req.params.productId, status: 'active' })) throw new AppError('Product not found', 404, 'NOT_FOUND');
