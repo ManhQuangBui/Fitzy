@@ -85,4 +85,3 @@ The checkout lists MoMo, ZaloPay, and VNPay only when that provider's credential
 4. `POST /orders` with the shipping payload above, then `GET /orders`.
 5. Sign in at `/auth/login` with the seeded admin, replace the Bearer token, then call `/stats` and `/orders/admin/list`.
 6. Attempt `/admin/products` with the customer token; it should return 403.
-//7. ////// attack  ////

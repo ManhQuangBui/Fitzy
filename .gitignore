@@ -11,3 +11,4 @@ FITZY-API/uploads/*
 !FITZY-API/uploads/.gitkeep
 .DS_Store
 *.log
+.idea/
