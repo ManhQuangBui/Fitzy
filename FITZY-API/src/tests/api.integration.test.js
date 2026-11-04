@@ -227,6 +227,13 @@ test('hiding a category hides its products from customers and blocks ordering th
   const blocked = await placeOrder();
   assert.equal(blocked.status, 409);
   assert.equal(blocked.body.error.code, 'PRODUCT_UNAVAILABLE');
+  const asCustomer = { Authorization: `Bearer ${customerToken}` };
+  assert.equal((await request(app).post(`/api/favorites/${item.id}`).set(asCustomer)).status, 404);
+  assert.equal((await request(app).post('/api/promotions/check').set(asCustomer).send({ code: 'SAVE10', items: [{ productId: item.id, variantId: item.variants[0].id, quantity: 1 }] })).status, 409);
+  // Admin can still maintain products of a hidden category, but cannot move one into it.
+  assert.equal((await request(app).patch(`/api/admin/products/${item.id}`).set(headers).send({ price: 110000 })).status, 200);
+  const other = await mongoose.model('Category').create({ name: 'Visibility other', slug: 'visibility-other', status: 'hidden' });
+  assert.equal((await request(app).patch(`/api/admin/products/${item.id}`).set(headers).send({ category: other.id })).status, 400);
 
   assert.equal((await request(app).patch(`/api/admin/categories/${category.id}`).set(headers).send({ status: 'active' })).status, 200);
   assert.equal(await listed(), true);
@@ -246,7 +253,7 @@ test('category admin API validates input, rejects duplicates, protects used cate
     assert.equal(duplicate.status, 409);
     assert.equal(duplicate.body.error.code, 'CATEGORY_DUPLICATE');
   }
-  for (const body of [{ name: '' }, { name: '   ' }, { name: 'x'.repeat(81) }, { name: 'Valid name', status: 'archived' }, { name: 'Valid name', image: 'javascript:alert(1)' }, { name: 'Valid name', description: 'x'.repeat(501) }]) {
+  for (const body of [{ name: '' }, { name: '   ' }, { name: 'x'.repeat(81) }, { name: 'Valid name', status: 'archived' }, { name: 'Valid name', image: 'javascript:alert(1)' }, { name: 'Valid name', image: null },{ name: 'Valid name', description: 'x'.repeat(501) }]) {
     const rejected = await create(body);
     assert.equal(rejected.status, 400, JSON.stringify(body).slice(0, 60));
     assert.equal(rejected.body.error.code, 'INVALID_CATEGORY');
