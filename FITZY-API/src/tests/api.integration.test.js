@@ -436,7 +436,13 @@ test('order status history records supported transitions and only delivered orde
     assert.equal(transition.status, 200);
   }
   const completed = await mongoose.model('Order').findById(placedOrder._id);
-  assert.equal(completed.paymentStatus, 'paid');
+  assert.equal(completed.paymentStatus, 'unpaid');
+  const orderSearch = await request(app).get(`/api/orders/admin/list?q=${completed.orderNumber}&status=completed`).set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(orderSearch.status, 200);
+  assert.equal(orderSearch.body.data.items.length, 1);
+  const customerSearch = await request(app).get('/api/orders/admin/list?q=buyer%40test.fitzy').set('Authorization', `Bearer ${adminToken}`);
+  assert.ok(customerSearch.body.data.items.some(order => order._id === completed.id));
+  assert.equal((await request(app).get('/api/orders/admin/list').set('Authorization', `Bearer ${customerToken}`)).status, 403);
   assert.deepEqual(completed.statusHistory.map(event => event.status), ['pending', 'confirmed', 'preparing', 'shipping', 'delivery_failed', 'shipping', 'completed']);
   assert.equal(completed.statusHistory[2].note, 'Đang gói hàng.');
   assert.ok(completed.statusHistory.every(event => event.at instanceof Date));
@@ -450,4 +456,50 @@ test('order status history records supported transitions and only delivered orde
   assert.equal(stats.body.data.revenue, 120000);
   const refreshed = await mongoose.model('Product').findById(product.id);
   assert.equal(refreshed.salesCount, 1);
+});
+
+test('admin order date filters use complete Vietnam calendar days regardless of server timezone', async () => {
+  const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const Order = mongoose.model('Order');
+  const orderAt = (orderNumber, createdAt, status = 'pending') => ({ orderNumber, user: placedOrder.user, items: [], subtotal: 0, total: 0, status, createdAt });
+  await Order.create([
+    orderAt('TZDAY-EDGE-EARLY', new Date('2026-11-01T17:30:00.000Z'), 'confirmed'),
+    orderAt('TZDAY-EDGE-LATE', new Date('2026-11-02T16:30:00.000Z')),
+    orderAt('TZDAY-BEFORE', new Date('2026-11-01T16:59:59.999Z')),
+    orderAt('TZDAY-AFTER', new Date('2026-11-02T17:00:00.000Z')),
+    orderAt('TZMULTI-START', new Date('2026-11-01T17:30:00.000Z')),
+    orderAt('TZMULTI-END', new Date('2026-11-04T16:30:00.000Z')),
+    orderAt('TZPAGE-1', new Date('2026-11-01T18:00:00.000Z')),
+    orderAt('TZPAGE-2', new Date('2026-11-02T15:00:00.000Z'))
+  ]);
+
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  try {
+    const early = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY-EDGE-EARLY' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(early.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-EARLY']);
+    const late = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY-EDGE-LATE' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(late.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-LATE']);
+
+    const exactDay = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(exactDay.body.data.items.map(order => order.orderNumber).sort(), ['TZDAY-EDGE-EARLY', 'TZDAY-EDGE-LATE']);
+    const emptyDay = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-05', to: '2026-11-05', q: 'TZDAY' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(emptyDay.body.data.pagination.total, 0);
+
+    const multipleDays = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-04', q: 'TZMULTI' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(multipleDays.body.data.items.map(order => order.orderNumber).sort(), ['TZMULTI-END', 'TZMULTI-START']);
+    const statusAndDate = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY', status: 'confirmed' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(statusAndDate.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-EARLY']);
+    const searchAndDate = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY-EDGE-LATE' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(searchAndDate.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-LATE']);
+
+    const firstPage = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZPAGE', limit: 1, page: 1 }).set('Authorization', `Bearer ${adminToken}`);
+    const secondPage = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZPAGE', limit: 1, page: 2 }).set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(firstPage.body.data.pagination.total, 2);
+    assert.equal(firstPage.body.data.pagination.pages, 2);
+    assert.notEqual(firstPage.body.data.items[0].orderNumber, secondPage.body.data.items[0].orderNumber);
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
 });

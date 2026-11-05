@@ -127,7 +127,7 @@ async function changeOrderStatus(order, status, note = '') {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
-        const updated = await Order.updateOne({ _id: order._id, status: order.status }, { $set: { status, ...(order.paymentMethod === 'cod' ? { paymentStatus: 'paid' } : {}) }, $push: { statusHistory: historyEntry } }, { session });
+        const updated = await Order.updateOne({ _id: order._id, status: order.status }, { $set: { status }, $push: { statusHistory: historyEntry } }, { session });
         if (!updated.modifiedCount) throw new AppError('Order status changed; reload and try again', 409, 'ORDER_CHANGED');
         for (const item of order.items) await Product.updateOne({ _id: item.product }, { $inc: { salesCount: item.quantity } }, { session });
       });
