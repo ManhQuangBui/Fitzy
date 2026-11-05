@@ -17,7 +17,7 @@ function CustomerDetail({ id, onClose }) {
     }, [id]);
     if (state.loading) return <Modal title="Hồ sơ khách hàng" onClose={onClose}><div className="table-state"><span className="spinner" />Đang tải hồ sơ…</div></Modal>;
     if (state.error) return <Modal title="Hồ sơ khách hàng" onClose={onClose}><div className="inline-error">{state.error}</div></Modal>;
-    const { user, orderCount, spent, recentOrders = [] } = state.data;
+    const { user, orderCount, spent, recentOrders = [], activeOrders = [] } = state.data;
     return (
         <Modal title="Hồ sơ khách hàng" onClose={onClose}>
             {user.isBlocked && (
@@ -32,6 +32,7 @@ function CustomerDetail({ id, onClose }) {
                 <div><small>Tham gia</small><b>{date(user.createdAt)}</b></div>
                 <div><small>Đơn hàng</small><b>{orderCount}</b></div>
                 <div><small>Giá trị đơn không hủy</small><b>{money(spent)}</b></div>
+                <div><small>Đơn đang xử lý</small><b style={{ color: activeOrders?.length ? '#d97706' : '#059669' }}>{activeOrders?.length || 0} đơn</b></div>
             </div>
             <div className="address-card" style={{ marginTop: '14px' }}>
                 <b>Địa chỉ đã lưu</b>
@@ -91,6 +92,23 @@ export default function CustomersPage() {
     const [target, setTarget] = useState(null);
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState('');
+    const [targetActiveOrders, setTargetActiveOrders] = useState([]);
+    const [checkingTargetOrders, setCheckingTargetOrders] = useState(false);
+    const [modalError, setModalError] = useState('');
+
+    React.useEffect(() => {
+        if (target && !target.isBlocked) {
+            setCheckingTargetOrders(true);
+            setModalError('');
+            api.get(`/users/${target._id}`)
+                .then(res => setTargetActiveOrders(res.data.data.activeOrders || []))
+                .catch(() => setTargetActiveOrders([]))
+                .finally(() => setCheckingTargetOrders(false));
+        } else {
+            setTargetActiveOrders([]);
+            setModalError('');
+        }
+    }, [target]);
 
     const params = useMemo(() => ({
         page,
@@ -143,6 +161,7 @@ export default function CustomersPage() {
 
     const toggle = async () => {
         setBusy(true);
+        setModalError('');
         try {
             const willBlock = !target.isBlocked;
             await api.patch(`/users/${target._id}/block`, {
@@ -154,7 +173,8 @@ export default function CustomersPage() {
             setBlockReason('');
             refresh();
         } catch (err) {
-            setNotice(err.message);
+            setModalError(err.message);
+            setNotice(`⚠️ ${err.message}`);
         } finally {
             setBusy(false);
         }
@@ -308,13 +328,38 @@ export default function CustomersPage() {
             {target ? (
                 <Modal
                     title={target.isBlocked ? 'Mở khóa khách hàng?' : 'Khóa tài khoản khách hàng'}
-                    onClose={() => { setTarget(null); setBlockReason(''); }}
+                    onClose={() => { setTarget(null); setBlockReason(''); setModalError(''); setTargetActiveOrders([]); }}
                 >
                     <p className="dialog-copy" style={{ marginBottom: '12px' }}>
                         {target.isBlocked
                             ? `Khách hàng ${target.name} sẽ có thể đăng nhập và tiếp tục đặt hàng bình thường.`
                             : `Khách hàng ${target.name} sẽ bị chặn đăng nhập và không thể tạo đơn mới.`}
                     </p>
+
+                    {modalError ? (
+                        <div style={{ background: '#fdf2f2', border: '1px solid #f8b4b4', color: '#9b1c1c', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '14px' }}>
+                            <b>⚠️ Lỗi:</b> {modalError}
+                        </div>
+                    ) : null}
+
+                    {checkingTargetOrders ? (
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+                            <span className="spinner" style={{ marginRight: '6px' }} />Đang kiểm tra trạng thái đơn hàng của khách…
+                        </div>
+                    ) : null}
+
+                    {!target.isBlocked && targetActiveOrders.length > 0 ? (
+                        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '14px', lineHeight: '18px' }}>
+                            <b>⚠️ Không thể khóa tài khoản:</b> Khách hàng đang có <b>{targetActiveOrders.length} đơn hàng chưa hoàn tất</b>:
+                            <div style={{ marginTop: '4px', fontWeight: 600 }}>
+                                {targetActiveOrders.map(o => `${o.orderNumber} (${o.status})`).join(', ')}
+                            </div>
+                            <div style={{ marginTop: '6px', fontSize: '11px', color: '#b45309' }}>
+                                Theo quy định an toàn vận hành, bạn cần hoàn tất hoặc hủy các đơn hàng này trước khi khóa tài khoản.
+                            </div>
+                        </div>
+                    ) : null}
+
                     {!target.isBlocked && (
                         <div style={{ marginBottom: '16px' }}>
                             <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#555', marginBottom: '6px' }}>
@@ -326,16 +371,17 @@ export default function CustomersPage() {
                                 placeholder="VD: Boom hàng nhiều lần, spam đơn ảo..."
                                 value={blockReason}
                                 onChange={e => setBlockReason(e.target.value)}
+                                disabled={targetActiveOrders.length > 0}
                             />
                         </div>
                     )}
                     <div className="form-actions">
-                        <button className="button secondary" onClick={() => { setTarget(null); setBlockReason(''); }}>
+                        <button className="button secondary" onClick={() => { setTarget(null); setBlockReason(''); setModalError(''); setTargetActiveOrders([]); }}>
                             Hủy
                         </button>
                         <button
                             className={`button ${target.isBlocked ? 'primary' : 'danger'}`}
-                            disabled={busy}
+                            disabled={busy || checkingTargetOrders || (!target.isBlocked && targetActiveOrders.length > 0)}
                             onClick={toggle}
                         >
                             {busy ? 'Đang xử lý…' : target.isBlocked ? 'Xác nhận mở khóa' : 'Xác nhận khóa'}

@@ -20,7 +20,7 @@ import { theme } from '../../constants/theme';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// High-DPI anti-aliased monochrome vector icons
+
 const ICONS = {
   mail: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAMLSURBVHhe7ZotkBNBEIVPIpFIJBKJRFFIJBKJROK6BZnJzFEVGYm6QiJPIhAnwSEPB45CXRUGqpPNXfL2Z3a3J8lOqr+qNpvJS15n3+zsZs7ODMMwDMMwDMMwDONUOPf0tKTC75+d+I4eR8/L4Plr9PyvxAqev0fPH8OMXqC/0RDRveDZ44eVXsHzZYz0AP0OompOsWdMshxfe08P0XdvJFI10VMrx1fouxfzOT2pia0Fr9eNo1c4EU615jN6ee55Uc1BNU/B0Wv0nyQ4/oBC0hiJHY4tiTijt+hLphEcl6Q6U7bOHPoVPf+Q4zJpl9aouaM30ojg+Xdw9A2btCC6j+9pRQajQPT8Z7dhfKWa4A5E5eVTg5+dkijie1uRwSgQHP2tHZNfI+eaIjOreRST0FL6Bnm+wGN34ryYWuQkUtHzDX7Xqr7gMXWD5FjwxHj8tiYSuVSkVhcfR8/weJYGbV4Ljn/i66sPP3LkEpG6kaWJjOvy14uUgCzRo+PPOOZu7OEj1xUpWf+8n9GjzdiUvyR9BaYQuT6Rwh+rr79WhggcM3J9I4UM8dfIUIFjRG5IpJCh/mqMFThE5MZEChnr7xaNwD4jNzZSiMbfCq3APiKniRSi9acXqMgRuRyRQtT+1AJbaCKXK1KI2p9aABgTuZyRQtT+1AIt9IncPiKFqP2pBTpIRq7lNU2kELU/tUCCVOSwtJFC1P7UAj3pjNymORkihaj9qQUG0BG5bJFC1P7UAgPByOWOFKL2pxYYifz/37UuyoXan1pg4qj9qQUmjtqfWmDiqP2pBSaO2p9aYOKo/akFJo7aX5NAdPQcx5VKk79BDZJFGgrIbQGOKxVZa6G/QQ0S5M56t0F8iWNKpWnPZZ+nmzusNjmCiOzUwnGlUe3W3XkQJ/eCOC6JbEvDBlW1lPlITsnSqjpzak8p5Ykm+u+FPOVDsVMrOXsG7S7bpul0PLVS3xzLPwttu0NLLrkIZZtT1xvKifHKVmhJIpajY5VCLoc4+ZVSMmWgH8MwDMMwDMMwDMMojv9ZPuaAQWKvYQAAAABJRU5ErkJggg==',
   lock: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAPXSURBVHhe7ZshcBQxFIYrkUgkikEikQiGQSAYFIpBIHBUongRXLKb60xlJbLyJLKygwGJQFRWVp485uX2mLt/39L2Lv9ttrPfzDN77/a9fcm+JC/Zg4ORkZGRkZGRkZG9EoI8rLwcRu/OkgS3WJc6uF96fRrccfwqT/D/d5YY5H0d3G8MyHVSe3dZB3HHIvfxnneCeiKvtwkMigZKex7ef7CIyL0Y3Ak+6M7i3dnge1OM8iB6d956uDWpg7uKwc309dkQ775F7y5QH4J0Mdj81ATnfw94Gr28xP8hGoA6uBCDmxv3WAZ4aEFKr1VXz9ERa4sHSgHXoOL9lve80N/xP8WSXg98iNTa4lD3tlQTeWv2Ju/OtWFQvzh0tGo5H9xCHwx1t6V57TR3QQO4gLpFoS1oDuUT+Yy6u9LREPOiX7U0M2636nfUy0WaZYM9vYZ6xWCOWlsk5JuSeqx3l9iLipwfaSBawQnuBPVyY/VaXc6gXu/oCIWOVpU8Rb3caG8xRrUZ6vUOznu066MOC6MaMEed3sH8o3Mh1GFhvWbF5aENB32eSeFNaQ353i2OJvIY9XrjyMsjbME6fPmEeixikOdof1rJG9TrjejlBTpYB/mAeiyOvLxC+9Mq38x9Z6ZBnqGD0cuhXt+HqC20r9fRz72TqoTLhekfdLBvaSaQs9rLx70vYnW9o0sIdKpU0fXhPuZkCS1yWSvpYQh5hq1bNcasdVBCzU3GjHUp3v1sXQvyDpMpTapUREt2a+8WsXKLqXc/2j4tq4+UnNSajK3qwU1deb2KyCxxdGHZ17xj1acoJREdEdAQFt119sosb1yHZT9dg7SgQVvXyQKutfR1Q51Ssfblsq7VmpICv5uS0NGr7X/GZK03QwOak1CvVCz/6QHKaoAM3X+6ATJ0/+kGyND9pxsgQ/efboAM3X+2gVQdWB530aXMae6VN9t/qgFdAFvVgVz3V5j+J5gGuo606CFO1N0Wpv8JpgFj6/ifoO62MP1PMA10lVBybjwy/U8wDWhFAO+dJOORGab/CbaB5uz0KlHPcwZHYfvPN0CG7j/dABm6/3QDZOj+0w2QoftPN0CG7j/dABm6/5YB3NEoGcv/rAFqtk42A5R5rsLE2tPLGiDFWHGXd1CyA+uAqVYRUG8njDXTPLsRAs2HNZvnJ4O7Qr2daT5J2mgFPdmadQMuM83HfFY55RR1d0YDYZUmVt+SatLW97oU0Rxp7cuntR5re7xz5T0kYQ8u1j73UGRvp06gPDEMYfccZLUTMYBAzXLvktwanUhikuxbaIl4ZGRkZKQc/gLhmFR+/ZjSmwAAAABJRU5ErkJggg==',
@@ -100,7 +100,7 @@ export default function AuthScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Heading Section */}
+
         <View style={styles.headingSection}>
           <Text style={styles.badgeText}>FITZY ACCOUNT • FIREBASE</Text>
           <Text style={styles.mainTitle}>{isRegister ? 'Tạo tài khoản mới.' : 'Mừng bạn trở lại.'}</Text>
@@ -111,7 +111,7 @@ export default function AuthScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Input: Họ tên (Register) */}
+
         {isRegister ? (
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Họ tên</Text>
@@ -129,7 +129,7 @@ export default function AuthScreen({ navigation }) {
           </View>
         ) : null}
 
-        {/* Input: Email */}
+
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Email</Text>
           <View style={styles.inputContainer}>
@@ -146,7 +146,6 @@ export default function AuthScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Input: Mật khẩu */}
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Mật khẩu</Text>
           <View style={styles.inputContainer}>
@@ -160,7 +159,7 @@ export default function AuthScreen({ navigation }) {
               placeholderTextColor="#aaa69f"
               style={styles.input}
             />
-            {/* Nút icon mắt ẩn/hiện mật khẩu tinh tế trên nền vector mượt */}
+        -
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
@@ -176,7 +175,7 @@ export default function AuthScreen({ navigation }) {
             </Pressable>
           </View>
 
-          {/* Dưới ô mật khẩu: Chỉ duy nhất liên kết "Quên mật khẩu?" căn phải */}
+
           {!isRegister ? (
             <Pressable
               accessibilityRole="button"
@@ -189,7 +188,7 @@ export default function AuthScreen({ navigation }) {
           ) : null}
         </View>
 
-        {/* Input: Xác nhận mật khẩu (Register) */}
+
         {isRegister ? (
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Xác nhận mật khẩu</Text>
@@ -221,7 +220,7 @@ export default function AuthScreen({ navigation }) {
           </View>
         ) : null}
 
-        {/* Alert Notice Box */}
+
         {showNotice ? (
           <View style={styles.alertBox}>
             <View style={styles.alertIconBadge}>

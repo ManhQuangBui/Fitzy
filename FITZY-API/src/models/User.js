@@ -6,6 +6,6 @@ const addressSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 80 }, email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
   firebaseUid: { type: String, unique: true, sparse: true, select: false }, passwordHash: { type: String, select: false }, phone: { type: String, trim: true, default: '' }, addresses: { type: [addressSchema], default: [] },
-    role: { type: String, enum: ['customer', 'admin'], default: 'customer' }, isBlocked: { type: Boolean, default: false }, blockReason: { type: String, default: '', trim: true }
+    role: { type: String, enum: ['customer', 'admin'], default: 'customer' }, isBlocked: { type: Boolean, default: false }, blockReason: { type: String, default: '', trim: true }, blockedAt: { type: Date, default: null }
 }, { timestamps: true, toJSON: { transform: (doc, ret) => { delete ret.passwordHash; delete ret.firebaseUid; delete ret.__v; return ret; } } });
 module.exports = mongoose.model('User', userSchema);
