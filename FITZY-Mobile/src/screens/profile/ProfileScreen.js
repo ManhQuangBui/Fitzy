@@ -105,7 +105,8 @@ export default function ProfileScreen({ navigation }) {
   const user = useSelector(state => state.auth.user);
   const busy = useSelector(state => state.auth.status === 'loading');
   const error = useSelector(state => state.auth.error);
-  const orders = useSelector(state => state.orders.items || []);
+  const ordersList = useSelector(state => state.orders.items);
+  const orders = Array.isArray(ordersList) ? ordersList : [];
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -114,7 +115,6 @@ export default function ProfileScreen({ navigation }) {
   // Switches
   const [pushNotifications, setPushNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [smartSize, setSmartSize] = useState(true);
 
   useEffect(() => {
     setName(user?.name || '');
@@ -332,15 +332,10 @@ export default function ProfileScreen({ navigation }) {
             onSwitchChange={setDarkMode}
           />
           <SettingsItem
-            icon="stats-chart-outline"
+            icon="sparkles-outline"
             title="Gợi ý kích cỡ thông minh"
             subtitle="Tự động chọn size vừa vặn FITZY Fit"
-            isSwitch={true}
-            switchValue={smartSize}
-            onSwitchChange={v => {
-              setSmartSize(v);
-              if (v) navigation.navigate('Stylist');
-            }}
+            onPress={() => navigation.navigate('Stylist')}
             isLast={true}
           />
         </SectionGroup>

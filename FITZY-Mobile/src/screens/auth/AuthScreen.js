@@ -159,7 +159,6 @@ export default function AuthScreen({ navigation }) {
               placeholderTextColor="#aaa69f"
               style={styles.input}
             />
-        -
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}

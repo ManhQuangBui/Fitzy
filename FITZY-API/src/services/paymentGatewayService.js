@@ -66,12 +66,12 @@ async function postJson(url, payload) {
   return data;
 }
 
-function getPaymentUrl(providerId, order, ipAddress) {
+function getPaymentUrl(providerId, order, ipAddress, baseUrl) {
   const config = providers[providerId]?.config();
   if (!config || !providers[providerId].enabled(config)) throw new Error(`${providers[providerId]?.label || 'Payment method'} is not configured`);
   if (providerId === 'momo') return createMomoPayment(order, config);
   if (providerId === 'zalopay') return createZaloPayPayment(order, config);
-  return createVnPayPayment(order, config, ipAddress);
+  return createVnPayPayment(order, config, ipAddress, baseUrl);
 }
 
 function getPaymentReference(providerId, order) {
@@ -108,19 +108,25 @@ async function createZaloPayPayment(order, config) {
   return { url: response.order_url, transactionId: appTransId };
 }
 
-function createVnPayPayment(order, config, ipAddress = '127.0.0.1') {
+function createVnPayPayment(order, config, ipAddress = '127.0.0.1', baseUrl) {
+  let paymentUrl = config.paymentUrl;
+  let returnUrl = config.returnUrl;
+  if (baseUrl) {
+    paymentUrl = paymentUrl.replace(/https?:\/\/(localhost|127\.0\.0\.1):4000/, baseUrl);
+    returnUrl = returnUrl.replace(/https?:\/\/(localhost|127\.0\.0\.1):4000/, baseUrl);
+  }
   const now = new Date();
   const local = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(now).reduce((out, part) => ({ ...out, [part.type]: part.value }), {});
   const params = {
     vnp_Amount: String(order.total * 100), vnp_Command: 'pay', vnp_CreateDate: `${local.year}${local.month}${local.day}${local.hour}${local.minute}${local.second}`,
     vnp_CurrCode: 'VND', vnp_IpAddr: ipAddress.replace(/^::ffff:/, '').slice(0, 45), vnp_Locale: 'vn', vnp_OrderInfo: `Thanh toan don ${order.orderNumber}`,
-    vnp_OrderType: 'other', vnp_ReturnUrl: config.returnUrl, vnp_TmnCode: config.tmnCode, vnp_TxnRef: order.orderNumber, vnp_Version: '2.1.0'
+    vnp_OrderType: 'other', vnp_ReturnUrl: returnUrl, vnp_TmnCode: config.tmnCode, vnp_TxnRef: order.orderNumber, vnp_Version: '2.1.0'
   };
   const sorted = Object.fromEntries(Object.entries(params).sort(([a], [b]) => a.localeCompare(b)));
   const signData = querystring.stringify(sorted, undefined, undefined, { encodeURIComponent: value => value });
   const signature = hmac('sha512', config.hashSecret, signData);
   const query = new URLSearchParams({ ...sorted, vnp_SecureHash: signature }).toString();
-  return { url: `${config.paymentUrl}?${query}`, transactionId: order.orderNumber };
+  return { url: `${paymentUrl}?${query}`, transactionId: order.orderNumber };
 }
 
 function verifyMomoCallback(payload) {

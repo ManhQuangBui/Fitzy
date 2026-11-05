@@ -11,7 +11,19 @@ const app = express();
 app.set('trust proxy', 1);
 const origins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map(value => value.trim());
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin(origin, callback) { if (!origin || origins.includes('*') || origins.includes(origin)) return callback(null, true); callback(new Error('Origin is not allowed by CORS')); }, credentials: true }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || origins.includes('*') || origins.includes(origin)) return callback(null, true);
+    try {
+      const url = new URL(origin);
+      if (['localhost', '127.0.0.1'].includes(url.hostname) || url.hostname.startsWith('192.168.') || url.hostname.startsWith('10.') || url.hostname.startsWith('172.')) {
+        return callback(null, true);
+      }
+    } catch {}
+    callback(new Error('Origin is not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

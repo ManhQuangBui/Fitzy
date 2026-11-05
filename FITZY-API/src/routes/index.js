@@ -37,6 +37,8 @@ router.post('/payments/ipn/momo', orderController.momoIpn);
 router.post('/payments/ipn/zalopay', orderController.zaloPayIpn);
 router.get('/payments/ipn/vnpay', orderController.vnPayIpn);
 router.get('/payments/return/vnpay', orderController.vnPayReturn);
+router.get('/payments/vnpay/simulate', orderController.vnPaySimulate);
+router.post('/payments/vnpay/simulate', orderController.vnPaySimulateSubmit);
 router.post('/auth/register', authController.registerRules, validate, authController.register);
 router.post('/auth/login', loginLimit, authController.loginRules, validate, authController.login);
 router.post('/auth/firebase/exchange', firebaseExchangeLimit, [body('idToken').isString().isLength({ min: 1, max: 8192 }), body('name').optional().isString().isLength({ max: 80 })], validate, authController.exchangeFirebase);

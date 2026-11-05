@@ -17,6 +17,8 @@ const resource = {
 const orderNext = { pending: ['confirmed', 'cancelled'], confirmed: ['preparing', 'cancelled'], preparing: ['shipping', 'cancelled'], shipping: ['completed', 'delivery_failed'], delivery_failed: ['shipping'], completed: [], cancelled: [] };
 const statusLabel = { active: 'Đang hoạt động', hidden: 'Đã ẩn', draft: 'Bản nháp', published: 'Đã xuất bản', pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', preparing: 'Đang chuẩn bị hàng', shipping: 'Đang giao hàng', completed: 'Đã giao hàng', delivery_failed: 'Giao hàng thất bại', cancelled: 'Đã hủy', visible: 'Đang hiển thị', blocked: 'Đã khóa' };
 const pageLimit = 10;
+const paymentMethodLabel = { cod: 'COD', bank_transfer: 'Chuyển khoản', momo: 'MoMo', zalopay: 'ZaloPay', vnpay: 'VNPay' };
+const paymentStatusLabel = { unpaid: 'Chưa thanh toán', pending: 'Đang chờ thanh toán', paid: 'Đã thanh toán', failed: 'Thất bại', refunded: 'Đã hoàn tiền', expired: 'Hết hạn' };
 const singularLabel = { categories: 'danh mục', products: 'sản phẩm', posts: 'bài viết', promotions: 'khuyến mãi' };
 
 function dateText(value) { return value ? new Date(value).toLocaleDateString('vi-VN') : '—'; }
@@ -158,7 +160,7 @@ function Editor({ kind, item, categories, onClose, onSave }) {
   </Modal>;
 }
 
-function DetailModal({ kind, record, onClose, onStatus }) {
+function DetailModal({ kind, record, onClose, onStatus, onPaymentAction }) {
   const [data, setData] = useState({ value: null, loading: true, error: '' });
   useEffect(() => {
     let active = true;
@@ -168,6 +170,14 @@ function DetailModal({ kind, record, onClose, onStatus }) {
     return () => { active = false; };
   }, [kind, record._id]);
   const value = data.value;
+  const confirmTransfer = () => Alert.alert('Xác nhận thanh toán', 'Xác nhận khách đã chuyển khoản thành công?', [
+    { text: 'Hủy', style: 'cancel' },
+    { text: 'Xác nhận', onPress: async () => { try { await api.patch(`/orders/${value._id}/payment/confirm`); onPaymentAction?.(); onClose(); } catch (err) { Alert.alert('Lỗi', err.message); } } }
+  ]);
+  const confirmRefund = () => Alert.alert('Xác nhận hoàn tiền', 'Xác nhận đã hoàn tiền cho đơn hàng này?', [
+    { text: 'Hủy', style: 'cancel' },
+    { text: 'Hoàn tiền', style: 'destructive', onPress: async () => { try { await api.patch(`/orders/${value._id}/payment/refund`); onPaymentAction?.(); onClose(); } catch (err) { Alert.alert('Lỗi', err.message); } } }
+  ]);
   return <Modal visible transparent animationType="slide" onRequestClose={onClose}>
     <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}><View style={{ maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: theme.colors.paper, padding: 18, gap: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: theme.colors.ink, fontSize: 20, fontWeight: '800' }}>{kind === 'orders' ? 'Chi tiết đơn hàng' : 'Hồ sơ khách hàng'}</Text><Pressable onPress={onClose}><Text style={{ color: theme.colors.muted, fontSize: 25 }}>×</Text></Pressable></View>
@@ -177,7 +187,9 @@ function DetailModal({ kind, record, onClose, onStatus }) {
           <Text style={{ color: theme.colors.ink, fontWeight: '700' }}>Địa chỉ đã lưu</Text>
           {(value.user.addresses || []).length ? value.user.addresses.map(address => <Text key={address._id} style={{ color: theme.colors.muted, lineHeight: 20 }}>{address.recipient} · {address.phone} · {[address.line1, address.ward, address.district, address.city].filter(Boolean).join(', ')}</Text>) : <Text style={{ color: theme.colors.muted }}>Chưa lưu địa chỉ.</Text>}
         </> : <>
-          <Info label="Mã đơn" value={value.orderNumber} /><Info label="Khách hàng" value={`${value.user?.name || ''} · ${value.user?.email || ''}`} /><Info label="Ngày đặt" value={dateText(value.createdAt)} /><Info label="Thanh toán" value={`${value.paymentMethod?.toUpperCase()} · ${value.paymentStatus}`} /><Info label="Trạng thái" value={statusLabel[value.status] || value.status} />
+          <Info label="Mã đơn" value={value.orderNumber} /><Info label="Khách hàng" value={`${value.user?.name || ''} · ${value.user?.email || ''}`} /><Info label="Ngày đặt" value={dateText(value.createdAt)} /><Info label="Thanh toán" value={`${paymentMethodLabel[value.paymentMethod] || value.paymentMethod?.toUpperCase()} · ${paymentStatusLabel[value.paymentStatus] || value.paymentStatus}`} /><Info label="Trạng thái" value={statusLabel[value.status] || value.status} />
+          {value.paymentMethod === 'bank_transfer' && value.paymentStatus === 'unpaid' ? <Button title="Xác nhận đã nhận chuyển khoản" variant="light" onPress={confirmTransfer} /> : null}
+          {['bank_transfer', 'momo', 'zalopay', 'vnpay'].includes(value.paymentMethod) && value.paymentStatus === 'paid' ? <Button title="Xác nhận đã hoàn tiền" variant="light" onPress={confirmRefund} /> : null}
           <Text style={{ color: theme.colors.ink, fontWeight: '700' }}>Giao hàng</Text><Text style={{ color: theme.colors.muted, lineHeight: 20 }}>{value.shipping?.recipient} · {value.shipping?.phone}{'\n'}{[value.shipping?.line1, value.shipping?.ward, value.shipping?.district, value.shipping?.city].filter(Boolean).join(', ')}</Text>
           <Text style={{ color: theme.colors.ink, fontWeight: '700' }}>Sản phẩm</Text>
           {(value.items || []).map((item, index) => <Text key={`${item.product}-${index}`} style={{ color: theme.colors.muted, lineHeight: 20 }}>{item.name} · {item.size} / {item.color} · SL {item.quantity} · {formatVnd(item.unitPrice)}</Text>)}
@@ -336,7 +348,7 @@ export default function AdminManagementScreen({ route }) {
       <Button title="Sau" variant="light" disabled={page >= list.pagination.pages} onPress={() => setPage(value => value + 1)} style={{ minHeight: 42 }} />
     </View> : null}
     {editor !== undefined ? <Editor kind={kind} item={editor || null} categories={categories} onClose={() => setEditor(undefined)} onSave={save} /> : null}
-    {detail ? <DetailModal kind={kind} record={detail} onClose={() => setDetail(null)} onStatus={updateOrder} /> : null}
+    {detail ? <DetailModal kind={kind} record={detail} onClose={() => setDetail(null)} onStatus={updateOrder} onPaymentAction={() => { setNotice('Đã cập nhật trạng thái thanh toán.'); reload(); }} /> : null}
     {replyTarget ? <Modal visible transparent animationType="slide" onRequestClose={() => setReplyTarget(null)}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         <View style={{ maxHeight: '85%', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: theme.colors.paper, padding: 18, gap: 14 }}>

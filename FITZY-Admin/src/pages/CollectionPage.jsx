@@ -24,7 +24,28 @@ const resourceConfig = {
     { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang bán'], ['hidden', 'Đã ẩn']] }, { key: 'featured', label: 'Sản phẩm nổi bật', kind: 'checkbox' }
   ] },
   categories: { singular: 'danh mục', path: '/admin/categories', columns: [{ key: 'name', label: 'Tên danh mục' }, { key: 'slug', label: 'Đường dẫn' }, { key: 'description', label: 'Mô tả' }, { key: 'status', label: 'Trạng thái', type: 'status' }, { key: 'createdAt', label: 'Ngày tạo', type: 'date' }], fields: [{ key: 'name', label: 'Tên danh mục', required: true }, { key: 'description', label: 'Mô tả', multiline: true }, { key: 'image', label: 'Ảnh URL' }, { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang hoạt động'], ['hidden', 'Đã ẩn']] }] },
-  posts: { singular: 'bài viết', path: '/admin/posts', columns: [{ key: 'title', label: 'Tiêu đề' }, { key: 'excerpt', label: 'Tóm tắt' }, { key: 'status', label: 'Trạng thái', type: 'status' }, { key: 'publishedAt', label: 'Ngày đăng', type: 'date' }], fields: [{ key: 'title', label: 'Tiêu đề', required: true }, { key: 'excerpt', label: 'Tóm tắt', multiline: true }, { key: 'content', label: 'Nội dung', multiline: true, required: true }, { key: 'image', label: 'Ảnh URL' }, { key: 'status', label: 'Trạng thái', kind: 'select', options: [['draft', 'Bản nháp'], ['published', 'Xuất bản']] }] },
+  posts: { singular: 'bài viết', path: '/admin/posts', columns: [
+    { key: 'image', label: 'Ảnh', render: row => row.image ? <img className="product-thumb" src={row.image} alt={row.title} /> : '—' },
+    { key: 'title', label: 'Tiêu đề' }, 
+    { key: 'category', label: 'Chuyên mục' },
+    { key: 'status', label: 'Trạng thái', type: 'status' }, 
+    { key: 'publishedAt', label: 'Ngày đăng', type: 'date' }
+  ], fields: [
+    { key: 'title', label: 'Tiêu đề', required: true }, 
+    { key: 'excerpt', label: 'Tóm tắt', multiline: true }, 
+    { key: 'content', label: 'Nội dung', multiline: true, required: true }, 
+    { key: 'category', label: 'Chuyên mục', kind: 'select', options: [
+      ['Phối đồ hàng ngày', 'Phối đồ hàng ngày'],
+      ['Xu hướng mới', 'Xu hướng mới'],
+      ['Chăm sóc vải', 'Chăm sóc vải'],
+      ['Màu sắc & Chất liệu', 'Màu sắc & Chất liệu']
+    ]},
+    { key: 'badge', label: 'Huy hiệu / Tag nổi bật' },
+    { key: 'image', label: 'Ảnh đại diện', kind: 'singleImage' }, 
+    { key: 'relatedProducts', label: 'Gắn thẻ sản phẩm vào bài viết (Shoppable Outfit)', kind: 'productTags' },
+    { key: 'isEditorialPick', label: 'Đặt làm TIÊU ĐIỂM TUẦN NÀY (Hero Card)', kind: 'checkbox' },
+    { key: 'status', label: 'Trạng thái', kind: 'select', options: [['draft', 'Bản nháp'], ['published', 'Xuất bản']] }
+  ] },
   promotions: { singular: 'mã ưu đãi', path: '/admin/promotions', columns: [{ key: 'code', label: 'Mã' }, { key: 'discountType', label: 'Loại giảm' }, { key: 'discountValue', label: 'Giá trị', render: row => row.discountType === 'percent' ? `${row.discountValue}%` : money(row.discountValue) }, { key: 'usedCount', label: 'Đã dùng' }, { key: 'endsAt', label: 'Hết hạn', type: 'date' }, { key: 'active', label: 'Trạng thái' }], fields: [{ key: 'code', label: 'Mã khuyến mãi', required: true }, { key: 'discountType', label: 'Kiểu giảm', kind: 'select', options: [['percent', 'Phần trăm'], ['fixed', 'Số tiền cố định']] }, { key: 'discountValue', label: 'Giá trị giảm', type: 'number', required: true }, { key: 'minimumOrder', label: 'Đơn tối thiểu', type: 'number' }, { key: 'maximumDiscount', label: 'Giảm tối đa', type: 'number' }, { key: 'startsAt', label: 'Bắt đầu', type: 'datetime-local', required: true }, { key: 'endsAt', label: 'Kết thúc', type: 'datetime-local', required: true }, { key: 'usageLimit', label: 'Lượt sử dụng tối đa', type: 'number' }, { key: 'active', label: 'Đang kích hoạt', kind: 'checkbox' }] }
 };
 
@@ -36,6 +57,7 @@ function initialDraft(config, row) {
     const value = row?.[field.key];
     if (field.kind === 'variantList') result[field.key] = value?.length ? value.map(variant => ({ ...variant, quantity: String(variant.quantity) })) : [defaultVariant()];
     else if (field.kind === 'imageList') result[field.key] = Array.isArray(value) ? [...value] : [];
+    else if (field.kind === 'productTags') result[field.key] = Array.isArray(value) ? value.map(p => p._id || p) : [];
     else if (field.type === 'datetime-local') result[field.key] = dateForInput(value);
     else result[field.key] = value ?? (field.kind === 'checkbox' ? field.key === 'active' : field.key === 'status' ? 'active' : '');
   });
@@ -46,6 +68,7 @@ function mapDraft(config, draft) {
   config.fields.forEach(field => {
     if (field.kind === 'variantList') result[field.key] = draft[field.key].map(variant => ({ ...variant, size: variant.size.trim(), color: variant.color.trim(), sku: variant.sku?.trim() || '', quantity: Number(variant.quantity) }));
     else if (field.kind === 'imageList') result[field.key] = draft[field.key].filter(Boolean);
+    else if (field.kind === 'productTags') result[field.key] = Array.isArray(draft[field.key]) ? draft[field.key] : [];
     else if (field.kind === 'category') result[field.key] = draft[field.key]?._id || draft[field.key];
     else if (field.type === 'number') result[field.key] = draft[field.key] === '' ? undefined : Number(draft[field.key]);
     else if (field.type === 'datetime-local') result[field.key] = draft[field.key] ? new Date(draft[field.key]).toISOString() : undefined;
@@ -78,6 +101,64 @@ function ImageListEditor({ images, onChange, onError, onUploading }) {
   </div>;
 }
 
+function SingleImageEditor({ value, onChange, onError, onUploading }) {
+  const [uploading, setUploading] = useState(false);
+  const upload = async event => {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { onError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.'); return; }
+    if (file.size > 4 * 1024 * 1024) { onError('Ảnh tối đa 4 MB.'); return; }
+    setUploading(true); onUploading(true); onError('');
+    try {
+      const data = new FormData(); data.append('image', file);
+      const response = await api.post('/admin/uploads', data);
+      onChange(response.data.data.url);
+    } catch (error) { onError(error.message); }
+    finally { setUploading(false); onUploading(false); }
+  };
+  return <div className="single-image-editor" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', gap: 6 }}>
+      <input className="input" placeholder="Dán link ảnh (https://...) hoặc tải ảnh từ máy" value={value || ''} onChange={e => onChange(e.target.value)} style={{ flex: 1 }} />
+      <label className="button secondary" style={{ margin: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        {uploading ? 'Đang tải…' : '📁 Tải ảnh'}
+        <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={upload} style={{ display: 'none' }} />
+      </label>
+    </div>
+    {value ? <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <img src={value} alt="Preview" style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: '1px solid #ddd' }} />
+      <button type="button" className="button secondary small-button" onClick={() => onChange('')}>Xóa ảnh</button>
+    </div> : null}
+  </div>;
+}
+
+function ProductTagSelector({ value = [], onChange, products = [] }) {
+  const [search, setSearch] = useState('');
+  const selectedIds = new Set((value || []).map(item => item._id || item));
+  const filtered = products.filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase()));
+  const toggle = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onChange(Array.from(next));
+  };
+  return <div className="product-tag-selector" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <input className="input" placeholder="Tìm sản phẩm theo tên..." value={search} onChange={e => setSearch(e.target.value)} />
+    <small style={{ color: '#6b7280' }}>Đã gắn: <b>{selectedIds.size}</b> sản phẩm</small>
+    <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {filtered.length ? filtered.map(prod => {
+        const isSelected = selectedIds.has(prod._id);
+        return <div key={prod._id} onClick={() => toggle(prod._id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', backgroundColor: isSelected ? '#f4ede4' : 'transparent', border: isSelected ? '1px solid #c4b5a5' : '1px solid transparent' }}>
+          <input type="checkbox" checked={isSelected} readOnly style={{ cursor: 'pointer' }} />
+          {prod.images?.[0] ? <img src={prod.images[0]} alt="" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} /> : null}
+          <div style={{ flex: 1, fontSize: 13 }}>
+            <span style={{ color: '#181818', fontWeight: isSelected ? '700' : '400' }}>{prod.name}</span>
+            <span style={{ color: '#8c7d70', marginLeft: 8, fontSize: 11 }}>{Number(prod.price).toLocaleString('vi-VN')} đ</span>
+          </div>
+        </div>;
+      }) : <div style={{ padding: 8, textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>Không tìm thấy sản phẩm.</div>}
+    </div>
+  </div>;
+}
+
 function VariantEditor({ variants, onChange }) {
   const update = (index, key, value) => onChange(variants.map((variant, i) => i === index ? { ...variant, [key]: value } : variant));
   return <div className="variant-editor"><div className="variant-heading"><b>Biến thể & tồn kho</b><button type="button" className="button secondary small-button" onClick={() => onChange([...variants, { size: '', color: '', colorHex: '#222222', quantity: '0', sku: '', isActive: true }])}>＋ Thêm biến thể</button></div>
@@ -87,8 +168,11 @@ function VariantEditor({ variants, onChange }) {
 }
 
 function FormModal({ section, config, row, onClose, onSave }) {
-  const [draft, setDraft] = useState(() => initialDraft(config, row)); const [busy, setBusy] = useState(false); const [uploading, setUploading] = useState(false); const [error, setError] = useState(''); const [categories, setCategories] = useState([]);
-  useEffect(() => { if (section === 'products') api.get('/admin/categories', { params: { limit: 100, status: 'active' } }).then(response => setCategories(response.data.data.items || [])).catch(err => setError(err.message)); }, [section]);
+  const [draft, setDraft] = useState(() => initialDraft(config, row)); const [busy, setBusy] = useState(false); const [uploading, setUploading] = useState(false); const [error, setError] = useState(''); const [categories, setCategories] = useState([]); const [productsList, setProductsList] = useState([]);
+  useEffect(() => { 
+    if (section === 'products') api.get('/admin/categories', { params: { limit: 100, status: 'active' } }).then(response => setCategories(response.data.data.items || [])).catch(err => setError(err.message)); 
+    if (section === 'posts') api.get('/admin/products', { params: { limit: 100 } }).then(response => setProductsList(response.data.data.items || [])).catch(() => {});
+  }, [section]);
   const save = async event => {
     event.preventDefault(); setError('');
     try {
@@ -105,7 +189,7 @@ function FormModal({ section, config, row, onClose, onSave }) {
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
-  return <Modal title={`${row ? 'Chỉnh sửa' : 'Thêm'} ${config.singular}`} onClose={onClose}><form className="admin-form" onSubmit={save}><div className="form-grid">{config.fields.map(field => <div key={field.key} className={`field ${field.multiline || field.kind === 'variantList' || field.kind === 'imageList' ? 'wide' : ''}`}><span>{field.label}{field.required ? ' *' : ''}</span>{field.kind === 'imageList' ? <ImageListEditor images={draft.images} onChange={images => setDraft(current => ({ ...current, images }))} onError={setError} onUploading={setUploading} /> : field.kind === 'variantList' ? <VariantEditor variants={draft.variants} onChange={variants => setDraft(current => ({ ...current, variants }))} /> : field.kind === 'select' ? <select className="input" value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })}>{field.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : field.kind === 'category' ? <select className="input" value={draft[field.key]?._id || draft[field.key] || ''} onChange={event => setDraft({ ...draft, category: event.target.value })} required><option value="">Chọn danh mục</option>{categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}</select> : field.kind === 'checkbox' ? <span className="checkbox-field"><input type="checkbox" checked={Boolean(draft[field.key])} onChange={event => setDraft({ ...draft, [field.key]: event.target.checked })} /> Bật</span> : field.multiline ? <textarea className="input textarea" required={field.required} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} rows={4} /> : <input className="input" required={field.required} type={field.type || 'text'} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} min={field.type === 'number' ? '0' : undefined} />}</div>)}</div>{error ? <div className="inline-error">{error}</div> : null}<div className="form-actions"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button type="submit" className="button primary" disabled={busy || uploading}>{uploading ? 'Đang tải ảnh…' : busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div></form></Modal>;
+  return <Modal title={`${row ? 'Chỉnh sửa' : 'Thêm'} ${config.singular}`} onClose={onClose}><form className="admin-form" onSubmit={save}><div className="form-grid">{config.fields.map(field => <div key={field.key} className={`field ${field.multiline || field.kind === 'variantList' || field.kind === 'imageList' || field.kind === 'singleImage' || field.kind === 'productTags' ? 'wide' : ''}`}><span>{field.label}{field.required ? ' *' : ''}</span>{field.kind === 'imageList' ? <ImageListEditor images={draft.images} onChange={images => setDraft(current => ({ ...current, images }))} onError={setError} onUploading={setUploading} /> : field.kind === 'singleImage' ? <SingleImageEditor value={draft[field.key]} onChange={val => setDraft(current => ({ ...current, [field.key]: val }))} onError={setError} onUploading={setUploading} /> : field.kind === 'productTags' ? <ProductTagSelector value={draft[field.key]} onChange={val => setDraft(current => ({ ...current, [field.key]: val }))} products={productsList} /> : field.kind === 'variantList' ? <VariantEditor variants={draft.variants} onChange={variants => setDraft(current => ({ ...current, variants }))} /> : field.kind === 'select' ? <select className="input" value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })}>{field.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : field.kind === 'category' ? <select className="input" value={draft[field.key]?._id || draft[field.key] || ''} onChange={event => setDraft({ ...draft, category: event.target.value })} required><option value="">Chọn danh mục</option>{categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}</select> : field.kind === 'checkbox' ? <span className="checkbox-field"><input type="checkbox" checked={Boolean(draft[field.key])} onChange={event => setDraft({ ...draft, [field.key]: event.target.checked })} /> Bật</span> : field.multiline ? <textarea className="input textarea" required={field.required} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} rows={4} /> : <input className="input" required={field.required} type={field.type || 'text'} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} min={field.type === 'number' ? '0' : undefined} />}</div>)}</div>{error ? <div className="inline-error">{error}</div> : null}<div className="form-actions"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button type="submit" className="button primary" disabled={busy || uploading}>{uploading ? 'Đang tải ảnh…' : busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div></form></Modal>;
 }
 
 function ActivityModal({ product, onClose }) {

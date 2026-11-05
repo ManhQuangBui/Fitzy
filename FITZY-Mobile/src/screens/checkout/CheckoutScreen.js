@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { placeOrder } from '../../store/slices/orderSlice';
@@ -8,7 +8,13 @@ import { theme, formatVnd } from '../../constants/theme';
 import api from '../../services/api';
 
 export default function CheckoutScreen({ navigation }) {
-  const dispatch = useDispatch(); const items = useSelector(state => state.cart.items.filter(item => item.selected)); const promotion = useSelector(state => state.cart.selectedPromotion); const busy = useSelector(state => state.orders.status === 'loading'); const error = useSelector(state => state.orders.error); const user = useSelector(state => state.auth.user);
+  const dispatch = useDispatch();
+  const cartItems = useSelector(state => state.cart.items);
+  const items = useMemo(() => (cartItems || []).filter(item => item.selected), [cartItems]);
+  const promotion = useSelector(state => state.cart.selectedPromotion);
+  const busy = useSelector(state => state.orders.status === 'loading');
+  const error = useSelector(state => state.orders.error);
+  const user = useSelector(state => state.auth.user);
   const submitLock = useRef(false);
   const address = user?.addresses?.find(item => item.isDefault) || user?.addresses?.[0] || {};
   const [recipient, setRecipient] = useState(address.recipient || user?.name || ''); const [phone, setPhone] = useState(address.phone || user?.phone || ''); const [line1, setLine1] = useState(address.line1 || ''); const [ward, setWard] = useState(address.ward || ''); const [district, setDistrict] = useState(address.district || ''); const [city, setCity] = useState(address.city || ''); const [formError, setFormError] = useState('');
@@ -64,7 +70,7 @@ export default function CheckoutScreen({ navigation }) {
     <SectionTitle title="Phương thức thanh toán" />
     {paymentMethods.map(method => <Pressable key={method.id} accessibilityRole="radio" accessibilityState={{ checked: paymentMethod === method.id }} onPress={() => setPaymentMethod(method.id)} style={{ padding: 15, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1.5, borderColor: paymentMethod === method.id ? theme.colors.ink : theme.colors.line, gap: 6 }}><Text style={{ color: theme.colors.ink, fontWeight: '700' }}>{paymentMethod === method.id ? '◉' : '○'}  {method.name}</Text><Text style={{ color: theme.colors.muted, lineHeight: 20 }}>{method.description}</Text>{method.bankAccount ? <Text style={{ color: theme.colors.ink, lineHeight: 20 }}>Ngân hàng: {method.bankAccount.bankName}{method.bankAccount.branch ? ` · ${method.bankAccount.branch}` : ''}{'\n'}Số tài khoản: {method.bankAccount.accountNumber}{'\n'}Chủ tài khoản: {method.bankAccount.accountName}{'\n'}Nội dung chuyển khoản sẽ là mã đơn hàng.</Text> : null}</Pressable>)}
     <View style={{ padding: 16, backgroundColor: '#fff', borderRadius: 18, gap: 10 }}><Text style={{ color: theme.colors.ink, fontWeight: '700' }}>Tóm tắt đơn hàng</Text><Summary label="Tạm tính" value={formatVnd(subtotal)} /><Summary label="Ưu đãi" value={`− ${formatVnd(discount)}`} /><Summary label="Giao hàng" value={formatVnd(shippingFee)} /><Summary label="Tổng tiền" value={formatVnd(subtotal - discount + shippingFee)} strong /></View>
-    {formError ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{formError}</Text> : null}{error ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{error}</Text> : null}<Button title="Xác nhận đặt hàng" disabled={!items.length} loading={busy} onPress={submit} />
+    {formError ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{formError}</Text> : null}{error ? <Text accessibilityRole="alert" style={{ color: theme.colors.danger }}>{typeof error === 'string' ? error : (error?.message || 'Có lỗi xảy ra')}</Text> : null}<Button title="Xác nhận đặt hàng" disabled={!items.length} loading={busy} onPress={submit} />
   </Page>;
 }
 function Summary({ label, value, strong }) { return <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: strong ? theme.colors.ink : theme.colors.muted, fontWeight: strong ? '700' : '400' }}>{label}</Text><Text style={{ color: theme.colors.ink, fontWeight: strong ? '800' : '500' }}>{value}</Text></View>; }

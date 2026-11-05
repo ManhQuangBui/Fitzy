@@ -15,7 +15,7 @@ const { AppError, asyncHandler, pageResult } = require('../utils/errors');
 const definitions = {
   categories: { Model: Category, fields: ['name', 'description', 'image', 'status'], uniqueSlug: true },
   products: { Model: Product, fields: ['name', 'description', 'category', 'images', 'price', 'compareAtPrice', 'variants', 'status', 'featured', 'tags', 'salesCount'], uniqueSlug: true },
-  posts: { Model: Post, fields: ['title', 'excerpt', 'content', 'image', 'status', 'publishedAt'], slugField: 'title', uniqueSlug: true },
+  posts: { Model: Post, fields: ['title', 'excerpt', 'content', 'image', 'badge', 'category', 'readTime', 'author', 'tags', 'isEditorialPick', 'spotlightImages', 'relatedProducts', 'status', 'publishedAt'], slugField: 'title', uniqueSlug: true },
   promotions: { Model: Promotion, fields: ['code', 'discountType', 'discountValue', 'minimumOrder', 'maximumDiscount', 'startsAt', 'endsAt', 'usageLimit', 'active'] }
 };
 
@@ -198,13 +198,35 @@ const productActivity = asyncHandler(async (req, res) => {
 const publicCategories = asyncHandler(async (req, res) => res.json({ success: true, data: { items: await Category.find({ status: 'active' }).sort({ name: 1 }) } }));
 const publicPosts = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(30, Number(req.query.limit) || 10); const filter = { status: 'published', publishedAt: { $lte: new Date() } };
-  const [items, total] = await Promise.all([Post.find(filter).sort({ publishedAt: -1 }).skip((page - 1) * limit).limit(limit), Post.countDocuments(filter)]);
+  if (req.query.category && req.query.category !== 'Tất cả bài viết' && req.query.category !== 'all') {
+    filter.category = req.query.category;
+  }
+  if (req.query.q) {
+    const pattern = { $regex: String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    filter.$or = [{ title: pattern }, { excerpt: pattern }, { tags: pattern }];
+  }
+  const [items, total] = await Promise.all([
+    Post.find(filter)
+      .populate({ path: 'relatedProducts', select: 'name slug price compareAtPrice images category' })
+      .sort({ isEditorialPick: -1, publishedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Post.countDocuments(filter)
+  ]);
   res.json({ success: true, data: pageResult(items, total, page, limit) });
 });
 const publicPostDetail = asyncHandler(async (req, res) => {
-  const item = await Post.findOne({ slug: req.params.slug, status: 'published', publishedAt: { $lte: new Date() } });
-  if (!item) throw new AppError('Article not found', 404, 'NOT_FOUND');
-  res.json({ success: true, data: { item } });
+    const item = await Post.findOneAndUpdate(
+        { slug: req.params.slug, status: 'published', publishedAt: { $lte: new Date() } },
+        { $inc: { viewsCount: 1 } },
+        { new: true }
+    ).populate({
+        path: 'relatedProducts',
+        match: { status: 'active' },
+        select: 'name slug price compareAtPrice images category'
+    });
+    if (!item) throw new AppError('Article not found', 404, 'NOT_FOUND');
+    res.json({ success: true, data: { item } });
 });
 
 const favoritesList = asyncHandler(async (req, res) => res.json({ success: true, data: { items: await Favorite.find({ user: req.user.id }).populate({ path: 'product', match: { status: 'active' }, populate: { path: 'category', select: 'name slug' } }) } }));

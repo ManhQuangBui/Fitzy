@@ -214,9 +214,9 @@ export default function AppNavigator() {
         component={AuthScreen}
         options={{ title: 'Tài khoản FITZY', presentation: 'modal' }}
       />
-      <Stack.Screen name="Stylist" component={StylistScreen} options={{ title: 'FITZY Stylist' }} />
+      <Stack.Screen name="Stylist" component={StylistScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{ title: 'Viết đánh giá' }} />
-      <Stack.Screen name="Posts" component={PostsScreen} options={{ title: 'FITZY Journal' }} />
+      <Stack.Screen name="Posts" component={PostsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Post" component={PostScreen} options={{ title: 'Bài viết' }} />
     </Stack.Navigator>
   );
