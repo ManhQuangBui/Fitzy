@@ -317,9 +317,24 @@ const blockCustomer = asyncHandler(async (req, res) => {
     res.json({ success: true, data: { user } });
 });
 
+function vietnamDateBoundary(value, nextDay = false) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new AppError('Date filters must use YYYY-MM-DD', 400, 'INVALID_DATE_FILTER');
+  const calendarDate = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== value) throw new AppError('Date filters must use a valid calendar date', 400, 'INVALID_DATE_FILTER');
+  if (nextDay) calendarDate.setUTCDate(calendarDate.getUTCDate() + 1);
+  return new Date(`${calendarDate.toISOString().slice(0, 10)}T00:00:00.000+07:00`);
+}
+
 const adminOrders = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Number(req.query.limit) || 20); const filter = {};
-  if (req.query.status) filter.status = req.query.status; if (req.query.from || req.query.to) filter.createdAt = { ...(req.query.from ? { $gte: new Date(req.query.from) } : {}), ...(req.query.to ? { $lte: new Date(`${req.query.to}T23:59:59.999Z`) } : {}) };
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.from || req.query.to) filter.createdAt = { ...(req.query.from ? { $gte: vietnamDateBoundary(req.query.from) } : {}), ...(req.query.to ? { $lt: vietnamDateBoundary(req.query.to, true) } : {}) };
+  const query = String(req.query.q || '').trim().slice(0, 100);
+  if (query) {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matchingUsers = await User.find({ $or: [{ name: { $regex: escaped, $options: 'i' } }, { email: { $regex: escaped, $options: 'i' } }, { phone: { $regex: escaped, $options: 'i' } }] }).distinct('_id');
+    filter.$or = [{ orderNumber: { $regex: escaped, $options: 'i' } }, { user: { $in: matchingUsers } }];
+  }
   const [items, total] = await Promise.all([Order.find(filter).populate('user', 'name email phone').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), Order.countDocuments(filter)]);
   res.json({ success: true, data: pageResult(items, total, page, limit) });
 });
