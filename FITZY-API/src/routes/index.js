@@ -14,6 +14,7 @@ const resources = require('../controllers/resourceController');
 const stylistService = require('../integrations/gemini/stylistService');
 const Promotion = require('../models/Promotion');
 const Product = require('../models/Product');
+const Category = require('../models/Category');
 const { calculateDiscount, getBankTransferDetails } = require('../services/orderService');
 const paymentGatewayService = require('../services/paymentGatewayService');
 const { orderRules } = require('../validators/orderValidators');
@@ -67,9 +68,9 @@ router.post('/promotions/check', auth.requireAuth, [body('code').isString().trim
   const code = req.body.code.toUpperCase(); const now = new Date();
   const promotion = await Promotion.findOne({ code, active: true, startsAt: { $lte: now }, endsAt: { $gte: now }, $or: [{ usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }] });
   if (!promotion) return res.status(400).json({ success: false, error: { code: 'PROMOTION_INVALID', message: 'Promotion code is invalid or expired' } });
-  let subtotal = 0;
+  let subtotal = 0; const activeCategories = await Category.activeIds();
   for (const line of req.body.items) {
-    const product = await Product.findOne({ _id: line.productId, status: 'active' }); const variant = product?.variants.id(line.variantId);
+    const product = await Product.findOne({ _id: line.productId, status: 'active', category: { $in: activeCategories } }); const variant = product?.variants.id(line.variantId);
     if (!product || !variant || !variant.isActive || variant.quantity < Number(line.quantity)) return res.status(409).json({ success: false, error: { message: 'An item in your cart is unavailable' } });
     subtotal += product.price * Number(line.quantity);
   }

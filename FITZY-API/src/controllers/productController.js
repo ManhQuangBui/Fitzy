@@ -7,7 +7,7 @@ const { AppError } = require('../utils/errors');
 
 const list = asyncHandler(async (req, res) => {
   const page = readNumber(req.query.page, 'page', 1, 100000, 1); const limit = readNumber(req.query.limit, 'limit', 1, 48, 12);
-  const filter = { status: 'active' };
+  const filter = { status: 'active', category: { $in: await Category.activeIds() } };
   if (req.query.category) {
     const categoryFilter = mongoose.isValidObjectId(req.query.category) ? { $or: [{ _id: req.query.category }, { slug: req.query.category }] } : { slug: req.query.category };
     const category = await Category.findOne({ ...categoryFilter, status: 'active' }).select('_id');
@@ -29,7 +29,7 @@ function readOptionalNumber(value, name) { if (value === undefined || value === 
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 const detail = asyncHandler(async (req, res) => {
   const filter = mongoose.isValidObjectId(req.params.id) ? { $or: [{ _id: req.params.id }, { slug: req.params.id }] } : { slug: req.params.id };
-  const product = await Product.findOne({ ...filter, status: 'active' }).populate('category', 'name slug');
+  const product = await Product.findOne({ ...filter, status: 'active', category: { $in: await Category.activeIds() } }).populate('category', 'name slug');
   if (!product) return res.status(404).json({ success: false, error: { message: 'Product not found' } });
   const reviews = await Review.find({ product: product._id, status: 'visible' }).populate('user', 'name').sort({ createdAt: -1 }).limit(50);
   res.json({ success: true, data: { product, reviews } });

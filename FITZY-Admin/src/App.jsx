@@ -16,7 +16,7 @@ function LoginPage({ onLogin }) {
 
 function Workspace({ user, onLogout }) {
   const location = useLocation(); const navigate = useNavigate(); const section = location.pathname.split('/')[1] || 'dashboard';
-  const page = section === 'dashboard' ? <Dashboard /> : section === 'orders' ? <OrdersPage /> : section === 'customers' ? <CustomersPage /> : section === 'reviews' ? <ReviewsPage /> : ['products', 'categories', 'posts', 'promotions'].includes(section) ? <CollectionPage section={section} /> : <Navigate to="/dashboard" replace />;
+  const page = section === 'dashboard' ? <Dashboard /> : section === 'orders' ? <OrdersPage /> : section === 'customers' ? <CustomersPage /> : section === 'reviews' ? <ReviewsPage /> : ['products', 'categories', 'posts', 'promotions'].includes(section) ? <CollectionPage key={section} section={section} /> : <Navigate to="/dashboard" replace />;
   return <AdminLayout section={section} user={user} onNavigate={key => navigate(`/${key}`)} onLogout={onLogout}>{page}</AdminLayout>;
 }
 
