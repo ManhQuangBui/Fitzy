@@ -13,6 +13,7 @@ import CheckoutScreen from '../screens/checkout/CheckoutScreen';
 import OrdersScreen from '../screens/orders/OrdersScreen';
 import OrderDetailScreen from '../screens/orders/OrderDetailScreen';
 import PaymentResultScreen from '../screens/checkout/PaymentResultScreen';
+import PaymentGatewayScreen from '../screens/checkout/PaymentGatewayScreen';
 import FavoritesScreen from '../screens/favorites/FavoritesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import AuthScreen from '../screens/auth/AuthScreen';
@@ -205,6 +206,7 @@ export default function AppNavigator() {
       />
       <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Thanh toán' }} />
       <Stack.Screen name="PaymentResult" component={PaymentResultScreen} options={{ title: 'Kết quả thanh toán' }} />
+      <Stack.Screen name="PaymentGateway" component={PaymentGatewayScreen} options={{ title: 'Thanh toán VNPay' }} />
       <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: 'Đơn hàng của tôi' }} />
       <Stack.Screen
         name="OrderDetail"

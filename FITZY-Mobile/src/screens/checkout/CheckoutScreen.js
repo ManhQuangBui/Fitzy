@@ -35,6 +35,10 @@ export default function CheckoutScreen({ navigation }) {
         const order = result.payload.order;
         dispatch(clearCart());
         if (result.payload.paymentUrl) {
+          if (paymentMethod === 'vnpay') {
+            navigation.replace('PaymentGateway', { orderId: order._id, paymentUrl: result.payload.paymentUrl });
+            return;
+          }
           navigation.replace('OrderDetail', { orderId: order._id });
           try { await Linking.openURL(result.payload.paymentUrl); }
           catch { Alert.alert('Đã tạo đơn hàng', `Không thể mở cổng thanh toán. Mã đơn ${order.orderNumber} vẫn được lưu trong Đơn hàng.`); }
