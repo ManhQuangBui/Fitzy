@@ -1,5 +1,4 @@
 const crypto = require('node:crypto');
-const querystring = require('node:querystring');
 const Order = require('../models/Order');
 
 const providers = {
@@ -110,17 +109,27 @@ async function createZaloPayPayment(order, config) {
 
 function createVnPayPayment(order, config, ipAddress = '127.0.0.1') {
   const now = new Date();
-  const local = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(now).reduce((out, part) => ({ ...out, [part.type]: part.value }), {});
+  const amount = order.total * 100;
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid VNPay amount');
   const params = {
-    vnp_Amount: String(order.total * 100), vnp_Command: 'pay', vnp_CreateDate: `${local.year}${local.month}${local.day}${local.hour}${local.minute}${local.second}`,
+    vnp_Amount: String(amount), vnp_Command: 'pay', vnp_CreateDate: vnPayDate(now),
     vnp_CurrCode: 'VND', vnp_IpAddr: ipAddress.replace(/^::ffff:/, '').slice(0, 45), vnp_Locale: 'vn', vnp_OrderInfo: `Thanh toan don ${order.orderNumber}`,
-    vnp_OrderType: 'other', vnp_ReturnUrl: config.returnUrl, vnp_TmnCode: config.tmnCode, vnp_TxnRef: order.orderNumber, vnp_Version: '2.1.0'
+    vnp_OrderType: 'other', vnp_ReturnUrl: config.returnUrl, vnp_TmnCode: config.tmnCode, vnp_TxnRef: order.providerTransactionId || order.orderNumber, vnp_Version: '2.1.0',
+    vnp_ExpireDate: vnPayDate(order.paymentExpiresAt || new Date(now.getTime() + 15 * 60 * 1000))
   };
-  const sorted = Object.fromEntries(Object.entries(params).sort(([a], [b]) => a.localeCompare(b)));
-  const signData = querystring.stringify(sorted, undefined, undefined, { encodeURIComponent: value => value });
+  const signData = vnPaySignData(params);
   const signature = hmac('sha512', config.hashSecret, signData);
-  const query = new URLSearchParams({ ...sorted, vnp_SecureHash: signature }).toString();
-  return { url: `${config.paymentUrl}?${query}`, transactionId: order.orderNumber };
+  return { url: `${config.paymentUrl}?${signData}&vnp_SecureHash=${signature}`, transactionId: params.vnp_TxnRef };
+}
+
+function vnPayDate(date) {
+  const local = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(date)).reduce((out, part) => ({ ...out, [part.type]: part.value }), {});
+  return `${local.year}${local.month}${local.day}${local.hour}${local.minute}${local.second}`;
+}
+
+function vnPaySignData(params) {
+  const encode = value => encodeURIComponent(value).replace(/%20/g, '+');
+  return Object.keys(params).sort().map(key => `${encode(key)}=${encode(params[key])}`).join('&');
 }
 
 function verifyMomoCallback(payload) {
@@ -139,13 +148,13 @@ function verifyZaloPayCallback(payload) {
 
 function verifyVnPayCallback(query) {
   const config = providers.vnpay.config();
-  if (!providers.vnpay.enabled(config) || !query.vnp_SecureHash) return false;
+  if (!providers.vnpay.enabled(config) || typeof query.vnp_SecureHash !== 'string' || !/^[a-f\d]{128}$/i.test(query.vnp_SecureHash)) return false;
+  if (Object.values(query).some(value => typeof value !== 'string')) return false;
   const { vnp_SecureHash, vnp_SecureHashType, ...unsigned } = query;
-  const sorted = Object.fromEntries(Object.entries(unsigned).sort(([a], [b]) => a.localeCompare(b)));
-  return safeEqual(hmac('sha512', config.hashSecret, querystring.stringify(sorted, undefined, undefined, { encodeURIComponent: value => value })), vnp_SecureHash);
+  return safeEqual(hmac('sha512', config.hashSecret, vnPaySignData(unsigned)), vnp_SecureHash.toLowerCase());
 }
 
-async function recordProviderResult({ provider, orderNumber, amount, success }) {
+async function recordProviderResult({ provider, orderNumber, amount, success, transactionId }) {
   const method = provider;
   const order = await Order.findOne({ orderNumber, paymentMethod: method });
   if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
@@ -154,7 +163,7 @@ async function recordProviderResult({ provider, orderNumber, amount, success }) 
   if (order.paymentExpiresAt && order.paymentExpiresAt <= new Date()) return { ok: false, reason: 'ORDER_EXPIRED' };
   if (order.status === 'cancelled' || !['pending', 'failed', 'unpaid'].includes(order.paymentStatus)) return { ok: false, reason: 'ORDER_NOT_PAYABLE' };
   const paymentStatus = success ? 'paid' : 'failed';
-  const updated = await Order.findOneAndUpdate({ _id: order._id, paymentStatus: { $in: ['pending', 'failed', 'unpaid'] }, status: { $ne: 'cancelled' }, $or: [{ paymentExpiresAt: null }, { paymentExpiresAt: { $gt: new Date() } }] }, { $set: { paymentStatus, ...(success ? { paymentUrl: '' } : {}) } }, { new: true });
+  const updated = await Order.findOneAndUpdate({ _id: order._id, paymentStatus: { $in: ['pending', 'failed', 'unpaid'] }, status: { $ne: 'cancelled' }, $or: [{ paymentExpiresAt: null }, { paymentExpiresAt: { $gt: new Date() } }] }, { $set: { paymentStatus, ...(success ? { paymentUrl: '', ...(provider === 'vnpay' ? { gatewayTransactionId: String(transactionId), paidAt: new Date() } : {}) } : {}) } }, { new: true });
   return updated ? { ok: true, order: updated } : { ok: false, reason: 'ORDER_NOT_PAYABLE' };
 }
 
@@ -176,8 +185,20 @@ async function processZaloPayCallback(payload) {
 }
 
 async function processVnPayCallback(query) {
-  if (!verifyVnPayCallback(query)) return { ok: false, reason: 'INVALID_SIGNATURE' };
+  const validation = await inspectVnPayReturn(query);
+  if (!validation.ok) return validation;
   return recordProviderResult({ provider: 'vnpay', orderNumber: query.vnp_TxnRef, amount: Number(query.vnp_Amount) / 100, success: query.vnp_ResponseCode === '00' && query.vnp_TransactionStatus === '00', transactionId: query.vnp_TransactionNo });
 }
 
-module.exports = { enabledProviders, getPaymentUrl, getPaymentReference, createVnPayPayment, verifyMomoCallback, verifyZaloPayCallback, verifyVnPayCallback, processMomoCallback, processZaloPayCallback, processVnPayCallback };
+// The browser return is for display only. Only a verified IPN changes payment state.
+async function inspectVnPayReturn(query) {
+  if (!verifyVnPayCallback(query)) return { ok: false, reason: 'INVALID_SIGNATURE' };
+  if (query.vnp_TmnCode !== providers.vnpay.config().tmnCode) return { ok: false, reason: 'INVALID_MERCHANT' };
+  if (!query.vnp_TxnRef || !/^\d{2}$/.test(query.vnp_ResponseCode || '') || !/^\d{2}$/.test(query.vnp_TransactionStatus || '') || !/^\d+$/.test(query.vnp_TransactionNo || '')) return { ok: false, reason: 'INVALID_DATA' };
+  const order = await Order.findOne({ orderNumber: query.vnp_TxnRef, paymentMethod: 'vnpay', providerTransactionId: query.vnp_TxnRef });
+  if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
+  if (!/^\d+$/.test(query.vnp_Amount || '') || !Number.isSafeInteger(Number(query.vnp_Amount)) || Number(query.vnp_Amount) !== order.total * 100) return { ok: false, reason: 'AMOUNT_MISMATCH' };
+  return { ok: true, order };
+}
+
+module.exports = { enabledProviders, getPaymentUrl, getPaymentReference, createVnPayPayment, verifyMomoCallback, verifyZaloPayCallback, verifyVnPayCallback, processMomoCallback, processZaloPayCallback, processVnPayCallback, inspectVnPayReturn };

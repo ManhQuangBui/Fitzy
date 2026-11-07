@@ -21,6 +21,13 @@ process.env.UPLOAD_DIR = path.join(os.tmpdir(), `fitzy-api-test-uploads-${proces
 let replicaSet; let app; let customerToken; let product; let variant; let adminUser; let placedOrder;
 const { syncFirebaseUser } = require('../services/authService');
 
+function signVnPay(params) {
+  const unsigned = Object.fromEntries(Object.entries(params).filter(([key]) => !['vnp_SecureHash', 'vnp_SecureHashType'].includes(key)).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+  // Encode independently of the payment service, using the provider's form encoding.
+  const data = Object.entries(unsigned).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value).replace(/%20/g, '+')}`).join('&');
+  return { ...params, vnp_SecureHash: crypto.createHmac('sha512', process.env.VNPAY_HASH_SECRET).update(data).digest('hex') };
+}
+
 test.before(async () => {
   replicaSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(replicaSet.getUri());
@@ -482,21 +489,86 @@ test('ZaloPay and VNPay create signed payments and verify signed callbacks', asy
   const vnOrder = vnPlaced.body.data.order;
   const params = Object.fromEntries(new URL(vnPlaced.body.data.paymentUrl).searchParams.entries());
   params.vnp_ResponseCode = '24'; params.vnp_TransactionStatus = '02'; params.vnp_TransactionNo = '0';
-  let unsigned = Object.fromEntries(Object.entries(params).filter(([key]) => !['vnp_SecureHash', 'vnp_SecureHashType'].includes(key)).sort(([a], [b]) => a.localeCompare(b)));
-  params.vnp_SecureHash = crypto.createHmac('sha512', process.env.VNPAY_HASH_SECRET).update(require('node:querystring').stringify(unsigned, undefined, undefined, { encodeURIComponent: value => value })).digest('hex');
+  params.vnp_SecureHash = signVnPay(params).vnp_SecureHash;
   const vnCancelled = await request(app).get('/api/payments/ipn/vnpay').query(params);
   assert.equal(vnCancelled.body.RspCode, '00');
   assert.equal((await Order.findById(vnOrder._id)).paymentStatus, 'failed');
   params.vnp_ResponseCode = '00'; params.vnp_TransactionStatus = '00'; params.vnp_TransactionNo = '88002';
-  unsigned = Object.fromEntries(Object.entries(params).filter(([key]) => !['vnp_SecureHash', 'vnp_SecureHashType'].includes(key)).sort(([a], [b]) => a.localeCompare(b)));
-  params.vnp_SecureHash = crypto.createHmac('sha512', process.env.VNPAY_HASH_SECRET).update(require('node:querystring').stringify(unsigned, undefined, undefined, { encodeURIComponent: value => value })).digest('hex');
+  params.vnp_SecureHash = signVnPay(params).vnp_SecureHash;
   const vnCallback = await request(app).get('/api/payments/ipn/vnpay').query(params);
   assert.equal(vnCallback.body.RspCode, '00');
   assert.equal((await Order.findById(vnOrder._id)).paymentStatus, 'paid');
-  assert.equal((await request(app).get('/api/payments/ipn/vnpay').query(params)).body.RspCode, '00');
+  assert.equal((await request(app).get('/api/payments/ipn/vnpay').query(params)).body.RspCode, '02');
   const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
   assert.equal((await request(app).patch(`/api/orders/${vnOrder._id}/payment/refund`).set('Authorization', `Bearer ${adminToken}`)).status, 200);
   assert.equal((await request(app).post(`/api/orders/${vnOrder._id}/cancel`).set('Authorization', `Bearer ${customerToken}`)).status, 200);
+});
+
+test('VNPay signs encoded URLs, validates notifications, and keeps browser returns read-only', async () => {
+  const Order = mongoose.model('Order');
+  const placed = await request(app).post('/api/orders').set('Authorization', `Bearer ${customerToken}`).send({
+    items: [{ productId: product.id, variantId: variant.id, quantity: 1 }], paymentMethod: 'vnpay',
+    shipping: { recipient: 'Test Buyer', phone: '0912345678', line1: '12 Test Street', district: 'District 1', city: 'Ho Chi Minh City' }
+  });
+  assert.equal(placed.status, 201);
+  const order = placed.body.data.order;
+  const url = new URL(placed.body.data.paymentUrl);
+  const params = Object.fromEntries(url.searchParams);
+  const rawSigned = url.search.slice(1).split('&vnp_SecureHash=')[0];
+  assert.equal(crypto.createHmac('sha512', process.env.VNPAY_HASH_SECRET).update(rawSigned).digest('hex'), params.vnp_SecureHash);
+  assert.match(rawSigned, /vnp_OrderInfo=Thanh\+toan\+don\+/);
+  assert.match(rawSigned, /vnp_ReturnUrl=https%3A%2F%2F/);
+  assert.ok(params.vnp_ExpireDate > params.vnp_CreateDate);
+  const expiry = new Date(order.paymentExpiresAt);
+  const vnExpiry = new Date(Date.UTC(Number(params.vnp_ExpireDate.slice(0, 4)), Number(params.vnp_ExpireDate.slice(4, 6)) - 1, Number(params.vnp_ExpireDate.slice(6, 8)), Number(params.vnp_ExpireDate.slice(8, 10)) - 7, Number(params.vnp_ExpireDate.slice(10, 12)), Number(params.vnp_ExpireDate.slice(12, 14))));
+  assert.ok(Math.abs(expiry - vnExpiry) < 1000);
+  // Real callback fields, rather than echoing the outgoing request.
+  const callback = signVnPay({ vnp_TmnCode: process.env.VNPAY_TMN_CODE, vnp_TxnRef: order.orderNumber, vnp_Amount: params.vnp_Amount, vnp_OrderInfo: 'Thanh toán đơn hàng & FITZY + thử', vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: '123456', vnp_BankCode: 'NCB', vnp_PayDate: params.vnp_CreateDate });
+  const ipn = payload => request(app).get('/api/payments/ipn/vnpay').query(payload);
+  assert.equal((await ipn({ ...callback, vnp_Amount: '1' })).body.RspCode, '97');
+  assert.equal((await ipn(signVnPay({ ...callback, vnp_Amount: '1' }))).body.RspCode, '04');
+  assert.equal((await ipn(signVnPay({ ...callback, vnp_TmnCode: 'OTHER' }))).body.RspCode, '97');
+  assert.equal((await ipn(signVnPay({ ...callback, vnp_TxnRef: 'MISSING' }))).body.RspCode, '01');
+  assert.equal((await ipn(signVnPay({ ...callback, vnp_TransactionStatus: '' }))).body.RspCode, '99');
+  assert.equal((await ipn({ ...callback, vnp_Amount: [params.vnp_Amount, '1'] })).body.RspCode, '97');
+  assert.equal((await Order.findById(order._id)).paymentStatus, 'pending');
+  const returned = await request(app).get('/api/payments/return/vnpay').query(callback);
+  assert.equal(returned.status, 302);
+  const location = new URL(returned.headers.location);
+  assert.equal(location.searchParams.get('orderId'), order._id);
+  assert.equal(location.searchParams.get('status'), 'pending');
+  assert.equal((await Order.findById(order._id)).paymentStatus, 'pending');
+  const invalidReturn = await request(app).get('/api/payments/return/vnpay').query({ ...callback, vnp_Amount: '1' });
+  assert.equal(new URL(invalidReturn.headers.location).searchParams.get('status'), 'invalid');
+  assert.equal(new URL(invalidReturn.headers.location).searchParams.has('orderId'), false);
+  assert.equal((await ipn(callback)).body.RspCode, '00');
+  assert.equal((await ipn(callback)).body.RspCode, '02');
+  assert.equal((await ipn(signVnPay({ ...callback, vnp_ResponseCode: '24', vnp_TransactionStatus: '02', vnp_TransactionNo: '0' }))).body.RspCode, '02');
+  const paid = await Order.findById(order._id);
+  assert.equal(paid.paymentStatus, 'paid');
+  assert.equal(paid.paymentUrl, '');
+  assert.equal(paid.gatewayTransactionId, '123456');
+  assert.ok(paid.paidAt instanceof Date);
+  // The app's status lookup remains protected by authentication and ownership.
+  assert.equal((await request(app).get(`/api/orders/${order._id}`)).status, 401);
+  const other = await request(app).post('/api/auth/register').send({ name: 'Other Buyer', email: 'other-payment@test.fitzy', password: 'secure-pass-123' });
+  assert.equal((await request(app).get(`/api/orders/${order._id}`).set('Authorization', `Bearer ${other.body.data.token}`)).status, 404);
+});
+
+test('VNPay rejects success after cancellation or payment expiry', async () => {
+  const Order = mongoose.model('Order');
+  for (const expired of [false, true]) {
+    const placed = await request(app).post('/api/orders').set('Authorization', `Bearer ${customerToken}`).send({
+      items: [{ productId: product.id, variantId: variant.id, quantity: 1 }], paymentMethod: 'vnpay',
+      shipping: { recipient: 'Test Buyer', phone: '0912345678', line1: '12 Test Street', district: 'District 1', city: 'Ho Chi Minh City' }
+    });
+    const order = placed.body.data.order;
+    if (expired) await Order.updateOne({ _id: order._id }, { $set: { paymentExpiresAt: new Date(Date.now() - 1000) } });
+    else assert.equal((await request(app).post(`/api/orders/${order._id}/cancel`).set('Authorization', `Bearer ${customerToken}`)).status, 200);
+    const callback = signVnPay({ vnp_TmnCode: process.env.VNPAY_TMN_CODE, vnp_TxnRef: order.orderNumber, vnp_Amount: String(order.total * 100), vnp_ResponseCode: '00', vnp_TransactionStatus: '00', vnp_TransactionNo: '123456' });
+    assert.equal((await request(app).get('/api/payments/ipn/vnpay').query(callback)).body.RspCode, '02');
+    assert.notEqual((await Order.findById(order._id)).paymentStatus, 'paid');
+  }
 });
 
 test('order status history records supported transitions and only delivered orders permit reviews', async () => {

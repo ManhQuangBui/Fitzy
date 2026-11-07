@@ -42,7 +42,7 @@ function Bootstrap() {
     return () => { active = false; unsubscribe(); };
   }, [dispatch]);
   if (!hydrated) return <View style={{ flex: 1, backgroundColor: theme.colors.paper, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color={theme.colors.ink} /></View>;
-  return <NavigationContainer key={role === 'admin' ? 'admin-navigation' : 'store-navigation'} linking={{ prefixes: ['fitzy://'], config: { screens: { Orders: 'payment-result' } } }} theme={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, background: theme.colors.paper, card: theme.colors.paper, text: theme.colors.ink, primary: theme.colors.ink } }}><StatusBar barStyle="dark-content" backgroundColor={theme.colors.paper} /><AppNavigator /></NavigationContainer>;
+  return <NavigationContainer key={role === 'admin' ? 'admin-navigation' : 'store-navigation'} linking={{ prefixes: ['fitzy://'], config: { screens: { PaymentResult: 'payment-result' } } }} theme={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, background: theme.colors.paper, card: theme.colors.paper, text: theme.colors.ink, primary: theme.colors.ink } }}><StatusBar barStyle="dark-content" backgroundColor={theme.colors.paper} /><AppNavigator /></NavigationContainer>;
 }
 
 export default function App() { return <Provider store={store}><Bootstrap /></Provider>; }
