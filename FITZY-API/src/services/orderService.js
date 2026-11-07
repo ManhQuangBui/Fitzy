@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const Category = require('../models/Category');
 const Promotion = require('../models/Promotion');
 const { AppError } = require('../utils/errors');
 const { enabledProviders } = require('./paymentGatewayService');
@@ -32,10 +33,11 @@ async function createOrder(userId, input) {
     await session.withTransaction(async () => {
       const orderItems = [];
       let subtotal = 0;
+      const activeCategories = await Category.activeIds();
       for (const item of input.items) {
         const quantity = Number(item.quantity);
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) throw new AppError('Item quantity must be between 1 and 20', 400, 'INVALID_QUANTITY');
-        const product = await Product.findOne({ _id: item.productId, status: 'active' }).session(session);
+        const product = await Product.findOne({ _id: item.productId, status: 'active', category: { $in: activeCategories } }).session(session);
         if (!product) throw new AppError('A product is no longer available', 409, 'PRODUCT_UNAVAILABLE');
         const variant = product.variants.id(item.variantId);
         if (!variant || !variant.isActive || variant.quantity < quantity) throw new AppError(`${product.name} (${variant?.size || 'variant'}) is out of stock`, 409, 'INSUFFICIENT_STOCK');
@@ -127,7 +129,7 @@ async function changeOrderStatus(order, status, note = '') {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
-        const updated = await Order.updateOne({ _id: order._id, status: order.status }, { $set: { status, ...(order.paymentMethod === 'cod' ? { paymentStatus: 'paid' } : {}) }, $push: { statusHistory: historyEntry } }, { session });
+        const updated = await Order.updateOne({ _id: order._id, status: order.status }, { $set: { status }, $push: { statusHistory: historyEntry } }, { session });
         if (!updated.modifiedCount) throw new AppError('Order status changed; reload and try again', 409, 'ORDER_CHANGED');
         for (const item of order.items) await Product.updateOne({ _id: item.product }, { $inc: { salesCount: item.quantity } }, { session });
       });

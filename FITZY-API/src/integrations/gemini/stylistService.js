@@ -1,5 +1,5 @@
 const Product = require('../../models/Product');
-require('../../models/Category');
+const Category = require('../../models/Category');
 
 const model = () => process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 const clean = value => String(value || '').trim().slice(0, 300);
@@ -141,9 +141,11 @@ async function advise(input) {
   const season = clean(input.season);
   const occasion = clean(input.occasion);
 
-  // Lọc sản phẩm active có biến thể size và còn hàng
+  // Lọc sản phẩm active có biến thể size, còn hàng và thuộc danh mục đang hoạt động
+  const activeCategoryIds = await Category.activeIds();
   const filter = {
     status: 'active',
+    category: { $in: activeCategoryIds },
     variants: {
       $elemMatch: {
         isActive: true,

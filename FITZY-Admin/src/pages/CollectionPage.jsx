@@ -23,43 +23,42 @@ const resourceConfig = {
     { key: 'images', label: 'Hình ảnh', kind: 'imageList' }, { key: 'variants', label: 'Biến thể', kind: 'variantList' }, { key: 'inventoryReason', label: 'Lý do điều chỉnh tồn kho', multiline: true },
     { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang bán'], ['hidden', 'Đã ẩn']] }, { key: 'featured', label: 'Sản phẩm nổi bật', kind: 'checkbox' }
   ] },
-  categories: { singular: 'danh mục', path: '/admin/categories', columns: [{ key: 'name', label: 'Tên danh mục' }, { key: 'slug', label: 'Đường dẫn' }, { key: 'description', label: 'Mô tả' }, { key: 'status', label: 'Trạng thái', type: 'status' }, { key: 'createdAt', label: 'Ngày tạo', type: 'date' }], fields: [{ key: 'name', label: 'Tên danh mục', required: true }, { key: 'description', label: 'Mô tả', multiline: true }, { key: 'image', label: 'Ảnh URL' }, { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang hoạt động'], ['hidden', 'Đã ẩn']] }] },
-    posts: {
-        singular: 'bài viết',
-        path: '/admin/posts',
-        columns: [
-            { key: 'image', label: 'Ảnh', render: row => row.image ? <img className="product-thumb" src={row.image} alt={row.title} /> : '—' },
-            { key: 'title', label: 'Tiêu đề' },
-            { key: 'category', label: 'Chuyên mục' },
-            { key: 'engagement', label: 'Tương tác', render: row => (
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>
+  categories: { singular: 'danh mục', path: '/admin/categories', columns: [{ key: 'name', label: 'Tên danh mục' }, { key: 'slug', label: 'Đường dẫn' }, { key: 'description', label: 'Mô tả' }, { key: 'productCount', label: 'Số sản phẩm' }, { key: 'status', label: 'Trạng thái', type: 'status' }, { key: 'createdAt', label: 'Ngày tạo', type: 'date' }], fields: [{ key: 'name', label: 'Tên danh mục', required: true }, { key: 'description', label: 'Mô tả', multiline: true }, { key: 'image', label: 'Ảnh URL' }, { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang hoạt động'], ['hidden', 'Đã ẩn']] }] },
+  posts: {
+    singular: 'bài viết',
+    path: '/admin/posts',
+    columns: [
+      { key: 'image', label: 'Ảnh', render: row => row.image ? <img className="product-thumb" src={row.image} alt={row.title} /> : '—' },
+      { key: 'title', label: 'Tiêu đề' },
+      { key: 'category', label: 'Chuyên mục' },
+      { key: 'engagement', label: 'Tương tác', render: row => (
+        <span style={{ fontSize: 12, color: '#6b7280' }}>
           👁️ {row.viewsCount || 0} · ❤️ {row.likesCount || 0}
         </span>
-                )},
-            { key: 'isEditorialPick', label: 'Tiêu điểm', render: row => row.isEditorialPick ? <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>★ HERO</span> : '—' },
-            { key: 'status', label: 'Trạng thái', type: 'status' },
-            { key: 'publishedAt', label: 'Ngày đăng', type: 'date' }
-        ],
-        fields: [
-            { key: 'title', label: 'Tiêu đề bài viết', required: true },
-            { key: 'excerpt', label: 'Đoạn tóm tắt mở đầu', multiline: true },
-            { key: 'content', label: 'Nội dung bài viết (Markdown)', multiline: true, required: true },
-            { key: 'category', label: 'Chuyên mục', kind: 'select', options: [
-                    ['Phối đồ hàng ngày', 'Phối đồ hàng ngày'],
-                    ['Xu hướng mới', 'Xu hướng mới'],
-                    ['Chăm sóc vải', 'Chăm sóc vải'],
-                    ['Màu sắc & Chất liệu', 'Màu sắc & Chất liệu']
-                ]},
-            { key: 'badge', label: 'Huy hiệu nổi bật (Ví dụ: TRENDING, HOW-TO)' },
-            { key: 'readTime', label: 'Thời gian đọc (Ví dụ: 3 phút đọc)' },
-            { key: 'image', label: 'Ảnh bìa chính (Hero)', kind: 'singleImage' },
-            // [BỔ SUNG]: Trường chọn 2 ảnh lookbook ghép đôi
-            { key: 'spotlightImages', label: 'Bộ 2 ảnh Spotlight Outfit', kind: 'spotlightImages' },
-            { key: 'relatedProducts', label: 'Gắn thẻ sản phẩm vào bài viết (Shoppable Outfit)', kind: 'productTags' },
-            { key: 'isEditorialPick', label: 'Đặt làm TIÊU ĐIỂM TUẦN NÀY (Thẻ lớn trên cùng)', kind: 'checkbox' },
-            { key: 'status', label: 'Trạng thái bài viết', kind: 'select', options: [['draft', 'Bản nháp'], ['published', 'Xuất bản']] }
-        ]
-    },
+      )},
+      { key: 'isEditorialPick', label: 'Tiêu điểm', render: row => row.isEditorialPick ? <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>★ HERO</span> : '—' },
+      { key: 'status', label: 'Trạng thái', type: 'status' },
+      { key: 'publishedAt', label: 'Ngày đăng', type: 'date' }
+    ],
+    fields: [
+      { key: 'title', label: 'Tiêu đề bài viết', required: true },
+      { key: 'excerpt', label: 'Đoạn tóm tắt mở đầu', multiline: true },
+      { key: 'content', label: 'Nội dung bài viết (Markdown)', multiline: true, required: true },
+      { key: 'category', label: 'Chuyên mục', kind: 'select', options: [
+        ['Phối đồ hàng ngày', 'Phối đồ hàng ngày'],
+        ['Xu hướng mới', 'Xu hướng mới'],
+        ['Chăm sóc vải', 'Chăm sóc vải'],
+        ['Màu sắc & Chất liệu', 'Màu sắc & Chất liệu']
+      ]},
+      { key: 'badge', label: 'Huy hiệu nổi bật (Ví dụ: TRENDING, HOW-TO)' },
+      { key: 'readTime', label: 'Thời gian đọc (Ví dụ: 3 phút đọc)' },
+      { key: 'image', label: 'Ảnh bìa chính (Hero)', kind: 'singleImage' },
+      { key: 'spotlightImages', label: 'Bộ 2 ảnh Spotlight Outfit', kind: 'spotlightImages' },
+      { key: 'relatedProducts', label: 'Gắn thẻ sản phẩm vào bài viết (Shoppable Outfit)', kind: 'productTags' },
+      { key: 'isEditorialPick', label: 'Đặt làm TIÊU ĐIỂM TUẦN NÀY (Thẻ lớn trên cùng)', kind: 'checkbox' },
+      { key: 'status', label: 'Trạng thái bài viết', kind: 'select', options: [['draft', 'Bản nháp'], ['published', 'Xuất bản']] }
+    ]
+  },
   promotions: { singular: 'mã ưu đãi', path: '/admin/promotions', columns: [{ key: 'code', label: 'Mã' }, { key: 'discountType', label: 'Loại giảm' }, { key: 'discountValue', label: 'Giá trị', render: row => row.discountType === 'percent' ? `${row.discountValue}%` : money(row.discountValue) }, { key: 'usedCount', label: 'Đã dùng' }, { key: 'endsAt', label: 'Hết hạn', type: 'date' }, { key: 'active', label: 'Trạng thái' }], fields: [{ key: 'code', label: 'Mã khuyến mãi', required: true }, { key: 'discountType', label: 'Kiểu giảm', kind: 'select', options: [['percent', 'Phần trăm'], ['fixed', 'Số tiền cố định']] }, { key: 'discountValue', label: 'Giá trị giảm', type: 'number', required: true }, { key: 'minimumOrder', label: 'Đơn tối thiểu', type: 'number' }, { key: 'maximumDiscount', label: 'Giảm tối đa', type: 'number' }, { key: 'startsAt', label: 'Bắt đầu', type: 'datetime-local', required: true }, { key: 'endsAt', label: 'Kết thúc', type: 'datetime-local', required: true }, { key: 'usageLimit', label: 'Lượt sử dụng tối đa', type: 'number' }, { key: 'active', label: 'Đang kích hoạt', kind: 'checkbox' }] }
 };
 
@@ -447,8 +446,27 @@ function MobilePreviewModal({ post, onClose }) {
 }
 
 export default function CollectionPage({ section }) {
-  const config = resourceConfig[section]; const [page, setPage] = useState(1); const [query, setQuery] = useState(''); const [search, setSearch] = useState(''); const [category, setCategory] = useState(''); const [status, setStatus] = useState(''); const [categories, setCategories] = useState([]); const [modalRow, setModalRow] = useState(undefined); const [deleteRow, setDeleteRow] = useState(null); const [activityRow, setActivityRow] = useState(null); const [previewRow, setPreviewRow] = useState(null); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState('');
-  const params = useMemo(() => ({ page, limit: 12, q: search || undefined, ...(section === 'products' || section === 'posts' ? { category: category || undefined, status: status || undefined } : {}) }), [page, search, section, category, status]);
+  const config = resourceConfig[section];
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [modalRow, setModalRow] = useState(undefined);
+  const [deleteRow, setDeleteRow] = useState(null);
+  const [activityRow, setActivityRow] = useState(null);
+  const [previewRow, setPreviewRow] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const params = useMemo(() => ({
+    page,
+    limit: 12,
+    q: search || undefined,
+    ...(section === 'products' ? { category: category || undefined, status: status || undefined } :
+        section === 'categories' ? { status: status || undefined } :
+        section === 'posts' ? { category: category || undefined, status: status || undefined } : {})
+  }), [page, search, section, category, status]);
   const { items, pagination, loading, error, refresh } = useResource(config.path, params);
   useEffect(() => { if (section === 'products') api.get('/admin/categories', { params: { limit: 100 } }).then(response => setCategories(response.data.data.items || [])).catch(() => {}); }, [section]);
   const save = async body => { if (modalRow) await api.patch(`${config.path}/${modalRow._id}`, body); else await api.post(config.path, body); setModalRow(undefined); setNotice('Đã lưu thay đổi.'); refresh(); };
@@ -456,10 +474,89 @@ export default function CollectionPage({ section }) {
   const handleSearch = event => { event.preventDefault(); setPage(1); setSearch(query.trim()); };
   return <div className="page-stack"><div className="page-heading"><div><span className="eyebrow">QUẢN LÝ CỬA HÀNG</span><h1>{title(section)}</h1><p>Quản lý và cập nhật dữ liệu {config.singular} FITZY.</p></div><button className="button primary" onClick={() => setModalRow(null)}><span>＋</span> Thêm {config.singular}</button></div>
     {notice ? <div className="notice-bar">{notice}<button onClick={() => setNotice('')}>×</button></div> : null}
-    <section className="panel data-panel"><div className="table-toolbar"><form className="search-form" onSubmit={handleSearch}><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Tìm ${config.singular}…`} /><button type="submit" className="button secondary">Tìm</button></form>{section === 'products' ? <div className="product-filters"><select aria-label="Lọc theo danh mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}><option value="">Tất cả danh mục</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select><select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}><option value="">Mọi trạng thái</option><option value="active">Đang bán</option><option value="hidden">Đã ẩn</option></select></div> : null}{section === 'posts' ? <div className="product-filters"><select aria-label="Lọc theo chuyên mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}><option value="">Tất cả chuyên mục</option><option value="Phối đồ hàng ngày">Phối đồ hàng ngày</option><option value="Xu hướng mới">Xu hướng mới</option><option value="Chăm sóc vải">Chăm sóc vải</option><option value="Màu sắc & Chất liệu">Màu sắc & Chất liệu</option></select><select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}><option value="">Mọi trạng thái</option><option value="published">Đã xuất bản</option><option value="draft">Bản nháp</option></select></div> : null}<div className="toolbar-meta">{pagination ? `${pagination.total} bản ghi` : 'FITZY'}</div></div>
-      <DataTable columns={config.columns} rows={items} loading={loading} error={error} onRetry={refresh} empty={`Chưa có ${config.singular}`} renderActions={row => <>{section === 'products' ? <button className="table-action" onClick={() => setActivityRow(row)}>Nhật ký</button> : null}{section === 'posts' ? <button className="table-action" onClick={() => setPreviewRow(row)}>Xem trước</button> : null}<button className="table-action" onClick={() => setModalRow(row)}>Sửa</button><button className="table-action danger-text" onClick={() => setDeleteRow(row)}>Xóa / ẩn</button></>} />
-      {pagination?.pages > 1 ? <div className="pagination"><span>Trang {pagination.page} / {pagination.pages}</span><div><button className="button secondary small-button" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>Trước</button><button className="button secondary small-button" disabled={page >= pagination.pages} onClick={() => setPage(value => value + 1)}>Sau</button></div></div> : null}
+    <section className="panel data-panel">
+      <div className="table-toolbar">
+        <form className="search-form" onSubmit={handleSearch}>
+          <span>⌕</span>
+          <input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Tìm ${config.singular}…`} />
+          <button type="submit" className="button secondary">Tìm</button>
+        </form>
+        {section === 'products' || section === 'categories' ? (
+          <div className="product-filters">
+            {section === 'products' ? (
+              <select aria-label="Lọc theo danh mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}>
+                <option value="">Tất cả danh mục</option>
+                {categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
+              </select>
+            ) : null}
+            <select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}>
+              <option value="">Mọi trạng thái</option>
+              <option value="active">{section === 'products' ? 'Đang bán' : 'Đang hoạt động'}</option>
+              <option value="hidden">Đã ẩn</option>
+            </select>
+          </div>
+        ) : null}
+        {section === 'posts' ? (
+          <div className="product-filters">
+            <select aria-label="Lọc theo chuyên mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}>
+              <option value="">Tất cả chuyên mục</option>
+              <option value="Phối đồ hàng ngày">Phối đồ hàng ngày</option>
+              <option value="Xu hướng mới">Xu hướng mới</option>
+              <option value="Chăm sóc vải">Chăm sóc vải</option>
+              <option value="Màu sắc & Chất liệu">Màu sắc & Chất liệu</option>
+            </select>
+            <select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}>
+              <option value="">Mọi trạng thái</option>
+              <option value="published">Đã xuất bản</option>
+              <option value="draft">Bản nháp</option>
+            </select>
+          </div>
+        ) : null}
+        <div className="toolbar-meta">{pagination ? `${pagination.total} bản ghi` : 'FITZY'}</div>
+      </div>
+      <DataTable
+        columns={config.columns}
+        rows={items}
+        loading={loading}
+        error={error}
+        onRetry={refresh}
+        empty={`Chưa có ${config.singular}`}
+        renderActions={row => (
+          <>
+            {section === 'products' ? <button className="table-action" onClick={() => setActivityRow(row)}>Nhật ký</button> : null}
+            {section === 'posts' ? <button className="table-action" onClick={() => setPreviewRow(row)}>Xem trước</button> : null}
+            <button className="table-action" onClick={() => setModalRow(row)}>Sửa</button>
+            <button className="table-action danger-text" onClick={() => setDeleteRow(row)}>Xóa / ẩn</button>
+          </>
+        )}
+      />
+      {pagination?.pages > 1 ? (
+        <div className="pagination">
+          <span>Trang {pagination.page} / {pagination.pages}</span>
+          <div>
+            <button className="button secondary small-button" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>Trước</button>
+            <button className="button secondary small-button" disabled={page >= pagination.pages} onClick={() => setPage(value => value + 1)}>Sau</button>
+          </div>
+        </div>
+      ) : null}
     </section>
-    {modalRow !== undefined ? <FormModal section={section} config={config} row={modalRow || null} onClose={() => setModalRow(undefined)} onSave={save} /> : null}{deleteRow ? <ConfirmDialog title={section === 'products' ? 'Ẩn sản phẩm?' : 'Xóa bản ghi?'} message={section === 'products' ? `“${deleteRow.name}” sẽ bị ẩn khỏi cửa hàng.` : `Bạn sắp xóa “${deleteRow.name || deleteRow.title || deleteRow.code}”. Một số tài nguyên đã sử dụng có thể bị từ chối xóa.`} onCancel={() => setDeleteRow(null)} onConfirm={remove} busy={busy} /> : null}{activityRow ? <ActivityModal product={activityRow} onClose={() => setActivityRow(null)} /> : null}{previewRow ? <MobilePreviewModal post={previewRow} onClose={() => setPreviewRow(null)} /> : null}
+    {modalRow !== undefined ? <FormModal section={section} config={config} row={modalRow || null} onClose={() => setModalRow(undefined)} onSave={save} /> : null}
+    {deleteRow ? (
+      <ConfirmDialog
+        title={section === 'products' ? 'Ẩn sản phẩm?' : 'Xóa bản ghi?'}
+        message={
+          section === 'products'
+            ? `“${deleteRow.name}” sẽ bị ẩn khỏi cửa hàng.`
+            : deleteRow.productCount > 0
+            ? `Danh mục “${deleteRow.name}” còn ${deleteRow.productCount} sản phẩm nên không thể xóa. Hãy chuyển sang trạng thái Đã ẩn bằng nút Sửa.`
+            : `Bạn sắp xóa “${deleteRow.name || deleteRow.title || deleteRow.code}”. Một số tài nguyên đã sử dụng có thể bị từ chối xóa.`
+        }
+        onCancel={() => setDeleteRow(null)}
+        onConfirm={remove}
+        busy={busy}
+      />
+    ) : null}
+    {activityRow ? <ActivityModal product={activityRow} onClose={() => setActivityRow(null)} /> : null}
+    {previewRow ? <MobilePreviewModal post={previewRow} onClose={() => setPreviewRow(null)} /> : null}
   </div>;
 }

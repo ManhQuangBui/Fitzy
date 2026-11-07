@@ -42,9 +42,26 @@ function adminList(kind) {
     }
     let query = Model.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
     if (kind === 'products') query = query.populate('category', 'name slug');
-    const [items, total] = await Promise.all([query, Model.countDocuments(filter)]);
+    const [found, total] = await Promise.all([query, Model.countDocuments(filter)]);
+    const items = kind === 'categories' ? await withProductCounts(found) : found;
     res.json({ success: true, data: pageResult(items, total, page, limit) });
   });
+}
+
+// Counts every product (hidden included), matching the rule that blocks deleting a category in use.
+async function withProductCounts(categories) {
+  const rows = await Product.aggregate([{ $match: { category: { $in: categories.map(item => item._id) } } }, { $group: { _id: '$category', count: { $sum: 1 } } }]);
+  const counts = new Map(rows.map(row => [String(row._id), row.count]));
+  return categories.map(item => ({ ...item.toObject(), productCount: counts.get(String(item._id)) || 0 }));
+}
+
+async function validateCategoryData(data, id) {
+  const invalid = message => new AppError(message, 400, 'INVALID_CATEGORY');
+  if ((!id || 'name' in data) && (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 80)) throw invalid('Category name is required and must be at most 80 characters');
+  if ('description' in data && (typeof data.description !== 'string' || data.description.length > 500)) throw invalid('Description must be at most 500 characters');
+  if ('image' in data && data.image !== '' && (typeof data.image !== 'string' || data.image.length > 2048 || !/^https?:\/\//i.test(data.image))) throw invalid('Image must be an http(s) URL');
+  if ('status' in data && !['active', 'hidden'].includes(data.status)) throw invalid('Invalid category status');
+  if (data.slug && await Category.exists({ slug: data.slug, ...(id ? { _id: { $ne: id } } : {}) })) throw new AppError('Tên danh mục đã tồn tại', 409, 'CATEGORY_DUPLICATE');
 }
 
 function adminCreate(kind) {
@@ -54,6 +71,7 @@ function adminCreate(kind) {
     if (definition.uniqueSlug) data.slug = slugBase(req.body.slug || req.body[definition.slugField || 'name']);
     if (kind === 'posts' && data.status === 'published' && !data.publishedAt) data.publishedAt = new Date();
     if (kind === 'products') await validateProductData(data);
+    if (kind === 'categories') await validateCategoryData(data);
     const item = await definition.Model.create(data);
     if (kind === 'products') await writeProductActivities(item, req.user.id, [
       { action: 'created', changes: [{ field: 'product', after: { name: item.name, price: item.price, category: item.category, status: item.status } }] },
@@ -70,6 +88,7 @@ function adminUpdate(kind) {
     if (definition.uniqueSlug && (req.body.slug || req.body[definition.slugField || 'name'])) update.slug = slugBase(req.body.slug || req.body[definition.slugField || 'name']);
     if (kind === 'posts' && update.status === 'published' && !update.publishedAt) update.publishedAt = new Date();
     let item;
+    if (kind === 'categories') await validateCategoryData(update, req.params.id);
     if (kind === 'products') {
       const current = await Product.findById(req.params.id);
       if (!current) throw new AppError('Record not found', 404, 'NOT_FOUND');
@@ -119,7 +138,8 @@ async function validateProductData(data, current) {
   if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) throw new AppError('Price must be a non-negative number', 400, 'INVALID_PRODUCT');
   if (compareAtPrice !== undefined && compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < price)) throw new AppError('List price must be greater than or equal to sale price', 400, 'INVALID_PRODUCT');
   if (!mongoose.isValidObjectId(categoryId)) throw new AppError('A valid category is required', 400, 'INVALID_CATEGORY');
-  if (!await Category.exists({ _id: categoryId, status: 'active' })) throw new AppError('Category does not exist or is not active', 400, 'INVALID_CATEGORY');
+  // Only a new or changed category must be active, so products of a hidden category stay editable.
+  if ((!current || String(categoryId) !== String(current.category)) && !await Category.exists({ _id: categoryId, status: 'active' })) throw new AppError('Category does not exist or is not active', 400, 'INVALID_CATEGORY');
   if (!['active', 'hidden'].includes(status)) throw new AppError('Invalid product status', 400, 'INVALID_PRODUCT');
   if (!Array.isArray(variants) || variants.length < 1 || variants.length > 100) throw new AppError('A product must have between 1 and 100 variants', 400, 'INVALID_VARIANTS');
   const skus = new Set();
@@ -232,10 +252,10 @@ const publicPostDetail = asyncHandler(async (req, res) => {
     res.json({ success: true, data: { item } });
 });
 
-const favoritesList = asyncHandler(async (req, res) => res.json({ success: true, data: { items: await Favorite.find({ user: req.user.id }).populate({ path: 'product', match: { status: 'active' }, populate: { path: 'category', select: 'name slug' } }) } }));
+const favoritesList = asyncHandler(async (req, res) => res.json({ success: true, data: { items: await Favorite.find({ user: req.user.id }).populate({ path: 'product', match: { status: 'active', category: { $in: await Category.activeIds() } }, populate: { path: 'category', select: 'name slug' } }) } }));
 const favoriteAdd = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.productId)) throw new AppError('Invalid product id', 400, 'INVALID_ID');
-  if (!await Product.exists({ _id: req.params.productId, status: 'active' })) throw new AppError('Product not found', 404, 'NOT_FOUND');
+  if (!await Product.exists({ _id: req.params.productId, status: 'active', category: { $in: await Category.activeIds() } })) throw new AppError('Product not found', 404, 'NOT_FOUND');
   const item = await Favorite.findOneAndUpdate({ user: req.user.id, product: req.params.productId }, { $setOnInsert: { user: req.user.id, product: req.params.productId } }, { upsert: true, new: true }).populate('product');
   res.status(201).json({ success: true, data: { item } });
 });
@@ -470,9 +490,24 @@ const blockCustomer = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user } });
 });
 
+function vietnamDateBoundary(value, nextDay = false) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new AppError('Date filters must use YYYY-MM-DD', 400, 'INVALID_DATE_FILTER');
+  const calendarDate = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== value) throw new AppError('Date filters must use a valid calendar date', 400, 'INVALID_DATE_FILTER');
+  if (nextDay) calendarDate.setUTCDate(calendarDate.getUTCDate() + 1);
+  return new Date(`${calendarDate.toISOString().slice(0, 10)}T00:00:00.000+07:00`);
+}
+
 const adminOrders = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Number(req.query.limit) || 20); const filter = {};
-  if (req.query.status) filter.status = req.query.status; if (req.query.from || req.query.to) filter.createdAt = { ...(req.query.from ? { $gte: new Date(req.query.from) } : {}), ...(req.query.to ? { $lte: new Date(`${req.query.to}T23:59:59.999Z`) } : {}) };
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.from || req.query.to) filter.createdAt = { ...(req.query.from ? { $gte: vietnamDateBoundary(req.query.from) } : {}), ...(req.query.to ? { $lt: vietnamDateBoundary(req.query.to, true) } : {}) };
+  const query = String(req.query.q || '').trim().slice(0, 100);
+  if (query) {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matchingUsers = await User.find({ $or: [{ name: { $regex: escaped, $options: 'i' } }, { email: { $regex: escaped, $options: 'i' } }, { phone: { $regex: escaped, $options: 'i' } }] }).distinct('_id');
+    filter.$or = [{ orderNumber: { $regex: escaped, $options: 'i' } }, { user: { $in: matchingUsers } }];
+  }
   const [items, total] = await Promise.all([Order.find(filter).populate('user', 'name email phone').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), Order.countDocuments(filter)]);
   res.json({ success: true, data: pageResult(items, total, page, limit) });
 });
@@ -484,11 +519,12 @@ const changeAdminOrderStatus = asyncHandler(async (req, res) => {
 const stats = asyncHandler(async (req, res) => {
   const range = req.query.range || 'month'; const start = new Date();
   if (range === 'day') start.setDate(start.getDate() - 29); else if (range === 'year') start.setFullYear(start.getFullYear() - 4, 0, 1); else start.setMonth(start.getMonth() - 11, 1);
+  const onSale = { status: 'active', category: { $in: await Category.activeIds() } };
   const [revenue, orders, customers, products, daily, topProducts] = await Promise.all([
     Order.aggregate([{ $match: { status: 'completed', createdAt: { $gte: start } } }, { $group: { _id: null, total: { $sum: '$total' } } }]),
-    Order.countDocuments({ createdAt: { $gte: start } }), User.countDocuments({ role: 'customer' }), Product.countDocuments({ status: 'active' }),
+    Order.countDocuments({ createdAt: { $gte: start } }), User.countDocuments({ role: 'customer' }), Product.countDocuments(onSale),
     Order.aggregate([{ $match: { status: 'completed', createdAt: { $gte: start } } }, { $group: { _id: { $dateToString: { format: range === 'day' ? '%Y-%m-%d' : range === 'year' ? '%Y' : '%Y-%m', date: '$createdAt' } }, revenue: { $sum: '$total' }, orders: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
-    Product.find({ status: 'active' }).sort({ salesCount: -1 }).limit(5).select('name price salesCount images')
+    Product.find(onSale).sort({ salesCount: -1 }).limit(5).select('name price salesCount images')
   ]);
   res.json({ success: true, data: { revenue: revenue[0]?.total || 0, orderCount: orders, customerCount: customers, productCount: products, chart: daily, topProducts } });
 });

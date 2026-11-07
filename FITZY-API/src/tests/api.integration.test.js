@@ -208,6 +208,80 @@ test('admin category CRUD and image upload enforce access and file constraints',
   assert.equal((await request(app).delete(`/api/admin/categories/${category.body.data.item._id}`).set(headers)).status, 200);
 });
 
+test('hiding a category hides its products from customers and blocks ordering them', async () => {
+  const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const headers = { Authorization: `Bearer ${adminToken}` };
+  const category = await mongoose.model('Category').create({ name: 'Visibility shirts', slug: 'visibility-shirts' });
+  const item = await mongoose.model('Product').create({ name: 'Visibility tee', slug: 'visibility-tee', category: category._id, price: 100000, status: 'active', variants: [{ size: 'M', color: 'Black', quantity: 5 }] });
+  const listed = async () => (await request(app).get('/api/products?limit=48')).body.data.items.some(entry => entry._id === item.id);
+  const placeOrder = () => request(app).post('/api/orders').set('Authorization', `Bearer ${customerToken}`).send({
+    items: [{ productId: item.id, variantId: item.variants[0].id, quantity: 1 }], paymentMethod: 'cod',
+    shipping: { recipient: 'Test Buyer', phone: '0912345678', line1: '12 Test Street', district: 'District 1', city: 'Ho Chi Minh City' }
+  });
+  assert.equal(await listed(), true);
+  assert.equal((await request(app).get(`/api/products/${item.id}`)).status, 200);
+
+  assert.equal((await request(app).patch(`/api/admin/categories/${category.id}`).set(headers).send({ status: 'hidden' })).status, 200);
+  assert.equal(await listed(), false);
+  assert.equal((await request(app).get(`/api/products/${item.id}`)).status, 404);
+  const blocked = await placeOrder();
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.error.code, 'PRODUCT_UNAVAILABLE');
+  const asCustomer = { Authorization: `Bearer ${customerToken}` };
+  assert.equal((await request(app).post(`/api/favorites/${item.id}`).set(asCustomer)).status, 404);
+  assert.equal((await request(app).post('/api/promotions/check').set(asCustomer).send({ code: 'SAVE10', items: [{ productId: item.id, variantId: item.variants[0].id, quantity: 1 }] })).status, 409);
+  // Admin can still maintain products of a hidden category, but cannot move one into it.
+  assert.equal((await request(app).patch(`/api/admin/products/${item.id}`).set(headers).send({ price: 110000 })).status, 200);
+  const other = await mongoose.model('Category').create({ name: 'Visibility other', slug: 'visibility-other', status: 'hidden' });
+  assert.equal((await request(app).patch(`/api/admin/products/${item.id}`).set(headers).send({ category: other.id })).status, 400);
+
+  assert.equal((await request(app).patch(`/api/admin/categories/${category.id}`).set(headers).send({ status: 'active' })).status, 200);
+  assert.equal(await listed(), true);
+  assert.equal((await request(app).get(`/api/products/${item.id}`)).status, 200);
+});
+
+test('category admin API validates input, rejects duplicates, protects used categories and reports product counts', async () => {
+  const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const headers = { Authorization: `Bearer ${adminToken}` };
+  const create = body => request(app).post('/api/admin/categories').set(headers).send(body);
+  const first = await create({ name: 'Áo khoác', status: 'active' });
+  assert.equal(first.status, 201);
+  const firstId = first.body.data.item._id;
+
+  for (const name of ['Áo khoác', 'Ao khoac']) {
+    const duplicate = await create({ name });
+    assert.equal(duplicate.status, 409);
+    assert.equal(duplicate.body.error.code, 'CATEGORY_DUPLICATE');
+  }
+  for (const body of [{ name: '' }, { name: '   ' }, { name: 'x'.repeat(81) }, { name: 'Valid name', status: 'archived' }, { name: 'Valid name', image: 'javascript:alert(1)' }, { name: 'Valid name', image: null },{ name: 'Valid name', description: 'x'.repeat(501) }]) {
+    const rejected = await create(body);
+    assert.equal(rejected.status, 400, JSON.stringify(body).slice(0, 60));
+    assert.equal(rejected.body.error.code, 'INVALID_CATEGORY');
+  }
+
+  const second = await create({ name: 'Quần jean' });
+  assert.equal(second.status, 201);
+  const secondId = second.body.data.item._id;
+  const renamedToDuplicate = await request(app).patch(`/api/admin/categories/${secondId}`).set(headers).send({ name: 'Ao khoac' });
+  assert.equal(renamedToDuplicate.status, 409);
+  assert.equal((await request(app).patch(`/api/admin/categories/${firstId}`).set(headers).send({ name: 'Áo khoác', description: 'Same name keeps working' })).status, 200);
+
+  await mongoose.model('Product').create({ name: 'Count tee', slug: 'count-tee', category: firstId, price: 100000, status: 'hidden', variants: [{ size: 'M', color: 'Black', quantity: 1 }] });
+  const inUse = await request(app).delete(`/api/admin/categories/${firstId}`).set(headers);
+  assert.equal(inUse.status, 409);
+  assert.equal(inUse.body.error.code, 'CATEGORY_IN_USE');
+
+  const all = (await request(app).get('/api/admin/categories?limit=100').set(headers)).body.data.items;
+  assert.equal(all.find(entry => entry._id === firstId).productCount, 1);
+  assert.equal(all.find(entry => entry._id === secondId).productCount, 0);
+
+  assert.equal((await request(app).patch(`/api/admin/categories/${secondId}`).set(headers).send({ status: 'hidden' })).status, 200);
+  const hidden = (await request(app).get('/api/admin/categories?status=hidden&limit=100').set(headers)).body.data.items;
+  assert.ok(hidden.some(entry => entry._id === secondId));
+  assert.ok(hidden.every(entry => entry.status === 'hidden'));
+  assert.equal((await request(app).delete(`/api/admin/categories/${secondId}`).set(headers)).status, 200);
+});
+
 test('bank transfer is listed when configured and can be confirmed by an admin', async () => {
   const methods = await request(app).get('/api/payments/methods');
   assert.equal(methods.status, 200);
@@ -436,7 +510,13 @@ test('order status history records supported transitions and only delivered orde
     assert.equal(transition.status, 200);
   }
   const completed = await mongoose.model('Order').findById(placedOrder._id);
-  assert.equal(completed.paymentStatus, 'paid');
+  assert.equal(completed.paymentStatus, 'unpaid');
+  const orderSearch = await request(app).get(`/api/orders/admin/list?q=${completed.orderNumber}&status=completed`).set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(orderSearch.status, 200);
+  assert.equal(orderSearch.body.data.items.length, 1);
+  const customerSearch = await request(app).get('/api/orders/admin/list?q=buyer%40test.fitzy').set('Authorization', `Bearer ${adminToken}`);
+  assert.ok(customerSearch.body.data.items.some(order => order._id === completed.id));
+  assert.equal((await request(app).get('/api/orders/admin/list').set('Authorization', `Bearer ${customerToken}`)).status, 403);
   assert.deepEqual(completed.statusHistory.map(event => event.status), ['pending', 'confirmed', 'preparing', 'shipping', 'delivery_failed', 'shipping', 'completed']);
   assert.equal(completed.statusHistory[2].note, 'Đang gói hàng.');
   assert.ok(completed.statusHistory.every(event => event.at instanceof Date));
@@ -450,4 +530,50 @@ test('order status history records supported transitions and only delivered orde
   assert.equal(stats.body.data.revenue, 120000);
   const refreshed = await mongoose.model('Product').findById(product.id);
   assert.equal(refreshed.salesCount, 1);
+});
+
+test('admin order date filters use complete Vietnam calendar days regardless of server timezone', async () => {
+  const adminToken = require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  const Order = mongoose.model('Order');
+  const orderAt = (orderNumber, createdAt, status = 'pending') => ({ orderNumber, user: placedOrder.user, items: [], subtotal: 0, total: 0, status, createdAt });
+  await Order.create([
+    orderAt('TZDAY-EDGE-EARLY', new Date('2026-11-01T17:30:00.000Z'), 'confirmed'),
+    orderAt('TZDAY-EDGE-LATE', new Date('2026-11-02T16:30:00.000Z')),
+    orderAt('TZDAY-BEFORE', new Date('2026-11-01T16:59:59.999Z')),
+    orderAt('TZDAY-AFTER', new Date('2026-11-02T17:00:00.000Z')),
+    orderAt('TZMULTI-START', new Date('2026-11-01T17:30:00.000Z')),
+    orderAt('TZMULTI-END', new Date('2026-11-04T16:30:00.000Z')),
+    orderAt('TZPAGE-1', new Date('2026-11-01T18:00:00.000Z')),
+    orderAt('TZPAGE-2', new Date('2026-11-02T15:00:00.000Z'))
+  ]);
+
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  try {
+    const early = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY-EDGE-EARLY' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(early.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-EARLY']);
+    const late = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY-EDGE-LATE' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(late.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-LATE']);
+
+    const exactDay = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(exactDay.body.data.items.map(order => order.orderNumber).sort(), ['TZDAY-EDGE-EARLY', 'TZDAY-EDGE-LATE']);
+    const emptyDay = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-05', to: '2026-11-05', q: 'TZDAY' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(emptyDay.body.data.pagination.total, 0);
+
+    const multipleDays = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-04', q: 'TZMULTI' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(multipleDays.body.data.items.map(order => order.orderNumber).sort(), ['TZMULTI-END', 'TZMULTI-START']);
+    const statusAndDate = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY', status: 'confirmed' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(statusAndDate.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-EARLY']);
+    const searchAndDate = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZDAY-EDGE-LATE' }).set('Authorization', `Bearer ${adminToken}`);
+    assert.deepEqual(searchAndDate.body.data.items.map(order => order.orderNumber), ['TZDAY-EDGE-LATE']);
+
+    const firstPage = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZPAGE', limit: 1, page: 1 }).set('Authorization', `Bearer ${adminToken}`);
+    const secondPage = await request(app).get('/api/orders/admin/list').query({ from: '2026-11-02', to: '2026-11-02', q: 'TZPAGE', limit: 1, page: 2 }).set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(firstPage.body.data.pagination.total, 2);
+    assert.equal(firstPage.body.data.pagination.pages, 2);
+    assert.notEqual(firstPage.body.data.items[0].orderNumber, secondPage.body.data.items[0].orderNumber);
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
 });
