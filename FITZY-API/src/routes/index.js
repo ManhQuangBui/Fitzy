@@ -100,10 +100,19 @@ for (const kind of ['categories', 'products', 'posts', 'promotions']) {
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 const storage = multer.diskStorage({ destination: uploadDir, filename: (req, file, callback) => callback(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${path.extname(file.originalname).toLowerCase()}`) });
-const upload = multer({ storage, limits: { fileSize: 4 * 1024 * 1024 }, fileFilter: (req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) });
+const upload = multer({
+  storage,
+  limits: { fileSize: 4 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    const validMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/pjpeg', 'image/x-png', 'application/octet-stream'];
+    const hasValidExt = /\.(jpe?g|png|webp)$/i.test(file.originalname);
+    callback(null, validMimes.includes(file.mimetype) || hasValidExt);
+  }
+});
 router.post('/admin/uploads', admin, upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, error: { message: 'Choose a JPG, PNG or WebP image under 4 MB' } });
-  res.status(201).json({ success: true, data: { url: `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` } });
+  const serverBaseUrl = (process.env.SERVER_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  res.status(201).json({ success: true, data: { url: `${serverBaseUrl}/uploads/${req.file.filename}` } });
 });
 
 module.exports = router;

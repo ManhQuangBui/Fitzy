@@ -37,6 +37,9 @@ function adminList(kind) {
       if (!mongoose.isValidObjectId(req.query.category)) throw new AppError('Invalid category', 400, 'INVALID_CATEGORY');
       filter.category = req.query.category;
     }
+    if (kind === 'posts' && req.query.category) {
+      filter.category = req.query.category;
+    }
     let query = Model.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
     if (kind === 'products') query = query.populate('category', 'name slug');
     const [items, total] = await Promise.all([query, Model.countDocuments(filter)]);

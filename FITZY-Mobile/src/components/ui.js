@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from 'react-native';
-import { theme } from '../constants/theme';
+import { theme, resolveImageUrl } from '../constants/theme';
 
 export function Page({ children, scroll = true, style, contentStyle, refreshControl }) {
   const Container = scroll ? require('react-native').ScrollView : View;
@@ -19,7 +19,7 @@ export function StateMessage({ title, message, action, onAction, loading }) { re
 export function ProductCard({ product, onPress, onFavorite, favorite }) {
   const image = product.images?.[0] || product.variants?.[0]?.images?.[0];
   return <Pressable onPress={onPress} style={{ flex: 1, gap: 8, paddingBottom: 10 }}><View style={{ height: 210, borderRadius: 18, overflow: 'hidden', backgroundColor: theme.colors.sand }}>
-    {image ? <Image source={{ uri: image }} resizeMode="cover" style={{ width: '100%', height: '100%' }} /> : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: theme.colors.muted }}>FITZY · DEMO</Text></View>}
+    {image ? <Image source={{ uri: resolveImageUrl(image) }} resizeMode="cover" style={{ width: '100%', height: '100%' }} /> : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: theme.colors.muted }}>FITZY · DEMO</Text></View>}
     {onFavorite ? <Pressable accessibilityRole="button" onPress={event => { event.stopPropagation(); onFavorite(); }} style={{ position: 'absolute', top: 10, right: 10, height: 36, width: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 17, color: favorite ? theme.colors.danger : theme.colors.ink }}>{favorite ? '♥' : '♡'}</Text></Pressable> : null}
   </View><Text numberOfLines={1} style={{ color: theme.colors.ink, fontWeight: '600' }}>{product.name}</Text><Text style={{ color: theme.colors.muted }}>{new Intl.NumberFormat('vi-VN').format(product.price)} ₫</Text></Pressable>;
 }

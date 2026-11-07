@@ -6,7 +6,7 @@ import api from '../../services/api';
 import { cancelOrder } from '../../store/slices/orderSlice';
 import { addItems } from '../../store/slices/cartSlice';
 import { Button, Page, StateMessage } from '../../components/ui';
-import { theme, formatVnd } from '../../constants/theme';
+import { theme, formatVnd, resolveImageUrl } from '../../constants/theme';
 
 const steps = [
   { key: 'pending', label: 'Chờ xác nhận', description: 'Cửa hàng đang tiếp nhận đơn hàng.' },
@@ -150,7 +150,7 @@ export default function OrderDetailScreen({ route, navigation }) {
       <Text style={{ color: theme.colors.ink, fontSize: 17, fontWeight: '800' }}>Sản phẩm ({order.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)})</Text>
       {!order.items.length ? <Text style={{ color: theme.colors.muted }}>Đơn hàng không có dữ liệu sản phẩm.</Text> : null}
       {order.items.map((item, index) => <View key={`${item.variantId}-${index}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-        {item.image ? <Image source={{ uri: item.image }} style={{ width: 62, height: 76, borderRadius: 11, backgroundColor: theme.colors.sand }} /> : <View style={{ width: 62, height: 76, borderRadius: 11, backgroundColor: theme.colors.sand }} />}
+        {item.image ? <Image source={{ uri: resolveImageUrl(item.image) }} style={{ width: 62, height: 76, borderRadius: 11, backgroundColor: theme.colors.sand }} /> : <View style={{ width: 62, height: 76, borderRadius: 11, backgroundColor: theme.colors.sand }} />}
         <View style={{ flex: 1, gap: 5 }}><Text style={{ color: theme.colors.ink, fontWeight: '700' }}>{item.name}</Text><Text style={{ color: theme.colors.muted, fontSize: 12 }}>Size {item.size} · {item.color} · SL {item.quantity}</Text><Text style={{ color: theme.colors.ink }}>{formatVnd(item.unitPrice)}</Text></View>
         <Text style={{ color: theme.colors.ink, fontWeight: '700' }}>{formatVnd(item.unitPrice * item.quantity)}</Text>
       </View>)}

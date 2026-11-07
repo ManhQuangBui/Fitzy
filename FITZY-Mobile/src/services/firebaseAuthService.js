@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   reload,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile as updateFirebaseProfile
@@ -70,8 +71,6 @@ async function exchangeOrRequestVerification(firebaseUser, options) {
   try { return await exchangeFirebaseUser(firebaseUser, options); }
   catch (error) {
     if (error.code === 'EMAIL_VERIFICATION_REQUIRED') {
-      // Preserve Firebase's send error so the UI does not falsely claim that an
-      // email was sent when Firebase rejected the verification request.
       await sendEmailVerification(firebaseUser);
       throw Object.assign(new Error(firebaseErrorMessage(error)), { code: error.code });
     }
@@ -98,7 +97,14 @@ export function signInWithFirebase({ email, password }) {
   return withAuthOperation(async () => {
     const auth = requireFirebaseAuth();
     const credential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-    return exchangeOrRequestVerification(credential.user, { forceRefresh: true });
+    try {
+      return await exchangeOrRequestVerification(credential.user, { forceRefresh: true });
+    } catch (error) {
+      // Dọn dẹp session trên Firebase client nếu exchange với API thất bại (vd tài khoản bị khóa)
+      await firebaseSignOut(auth).catch(() => {});
+      await tokenStore.clear().catch(() => {});
+      throw error;
+    }
   });
 }
 
@@ -108,7 +114,20 @@ export function registerWithFirebase({ name, email, password }) {
     const credential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
     const displayName = name.trim();
     if (displayName) await updateFirebaseProfile(credential.user, { displayName });
-    return exchangeOrRequestVerification(credential.user, { name: displayName, forceRefresh: true });
+    try {
+      return await exchangeOrRequestVerification(credential.user, { name: displayName, forceRefresh: true });
+    } catch (error) {
+      await firebaseSignOut(auth).catch(() => {});
+      await tokenStore.clear().catch(() => {});
+      throw error;
+    }
+  });
+}
+
+export function sendPasswordReset(email) {
+  return withAuthOperation(async () => {
+    const auth = requireFirebaseAuth();
+    await sendPasswordResetEmail(auth, email.trim().toLowerCase());
   });
 }
 

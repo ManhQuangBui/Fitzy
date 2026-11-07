@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchOrders } from '../../store/slices/orderSlice';
 import { Page, StateMessage } from '../../components/ui';
-import { theme, formatVnd } from '../../constants/theme';
+import { theme, formatVnd, resolveImageUrl } from '../../constants/theme';
 
 const statusLabel = { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', shipping: 'Đang giao', completed: 'Hoàn tất', cancelled: 'Đã hủy' };
 const orderStatuses = [['', 'Tất cả'], ['pending', 'Chờ xác nhận'], ['confirmed', 'Đã xác nhận'], ['preparing', 'Đang chuẩn bị'], ['shipping', 'Đang giao'], ['completed', 'Đã giao'], ['delivery_failed', 'Giao thất bại'], ['cancelled', 'Đã hủy']];
@@ -51,7 +51,7 @@ export default function OrdersScreen({ navigation }) {
           <View style={{ backgroundColor: `${statusColor}15`, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 }}><Text style={{ color: statusColor, fontSize: 11, fontWeight: '700' }}>{orderStatusLabel[order.status] || order.status}</Text></View>
         </View>
         {(order.items || []).slice(0, 2).map((item, index) => <View key={`${order._id}-${item.variantId || index}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {item.image ? <Image source={{ uri: item.image }} style={{ width: 50, height: 60, borderRadius: 9, backgroundColor: theme.colors.sand }} /> : <View style={{ width: 50, height: 60, borderRadius: 9, backgroundColor: theme.colors.sand }} />}
+          {item.image ? <Image source={{ uri: resolveImageUrl(item.image) }} style={{ width: 50, height: 60, borderRadius: 9, backgroundColor: theme.colors.sand }} /> : <View style={{ width: 50, height: 60, borderRadius: 9, backgroundColor: theme.colors.sand }} />}
           <View style={{ flex: 1, gap: 4 }}><Text numberOfLines={1} style={{ color: theme.colors.ink, fontWeight: '600' }}>{item.name}</Text><Text style={{ color: theme.colors.muted, fontSize: 11 }}>{item.size} / {item.color} × {item.quantity}</Text></View><Text style={{ color: theme.colors.ink }}>{formatVnd(item.unitPrice * item.quantity)}</Text>
         </View>)}
         {order.items.length > 2 ? <Text style={{ color: theme.colors.muted, fontSize: 12 }}>và {order.items.length - 2} sản phẩm khác</Text> : null}

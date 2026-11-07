@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearAuthError, signIn, signUp } from '../../store/slices/authSlice';
+import { firebaseErrorMessage, sendPasswordReset } from '../../services/firebaseAuthService';
 import { firebaseAuthConfigured, firebaseAuthConfigError } from '../../config/firebase';
 import { theme } from '../../constants/theme';
 
@@ -52,7 +53,7 @@ export default function AuthScreen({ navigation }) {
     });
   }, [navigation]);
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !emailPattern.test(normalizedEmail)) {
       return Alert.alert('Quên mật khẩu', 'Vui lòng nhập địa chỉ email vào ô Email để nhận hướng dẫn khôi phục mật khẩu.');
@@ -60,7 +61,12 @@ export default function AuthScreen({ navigation }) {
     if (!firebaseAuthConfigured) {
       return Alert.alert('Thông báo', firebaseAuthConfigError);
     }
-    Alert.alert('Quên mật khẩu', `Hệ thống sẽ gửi email đặt lại mật khẩu đến: ${normalizedEmail}.`);
+    try {
+      await sendPasswordReset(normalizedEmail);
+      Alert.alert('Thành công', `Thư hướng dẫn đặt lại mật khẩu đã được gửi đến: ${normalizedEmail}. Vui lòng kiểm tra hộp thư!`);
+    } catch (err) {
+      Alert.alert('Quên mật khẩu thất bại', firebaseErrorMessage(err));
+    }
   };
 
   const submit = async () => {

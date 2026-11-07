@@ -17,7 +17,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { askStylist, clearAdvice } from '../../store/slices/aiSlice';
 import { addItems } from '../../store/slices/cartSlice';
-import { formatVnd } from '../../constants/theme';
+import { formatVnd, resolveImageUrl } from '../../constants/theme';
 
 const GENDERS = [
   { id: 'nam', label: 'Nam' },
@@ -536,7 +536,7 @@ export default function StylistScreen({ navigation }) {
                       <View style={styles.productImageWrapper}>
                         {hasImage ? (
                           <Image
-                            source={{ uri: product.images[0] }}
+                            source={{ uri: resolveImageUrl(product.images[0]) }}
                             style={styles.productImage}
                             resizeMode="cover"
                           />

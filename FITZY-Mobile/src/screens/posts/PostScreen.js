@@ -1,40 +1,51 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Page, StateMessage } from '../../components/ui';
-import { theme } from '../../constants/theme';
-
-const resolveImageUrl = (url) => {
-  if (!url) return '';
-  const apiHost = (process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:4000/api').replace(/\/api\/?$/, '');
-  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
-    return url.replace(/^http:\/\/(localhost|127\.0\.0\.1):4000/, apiHost);
-  }
-  if (!url.startsWith('http')) {
-    return `${apiHost}${url.startsWith('/') ? '' : '/'}${url}`;
-  }
-  return url;
-};
+import { theme, resolveImageUrl } from '../../constants/theme';
 
 export default function PostScreen({ route, navigation }) {
   const [state, setState] = useState({ item: null, loading: true, error: '' });
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadPost = async (isRefresh = false) => {
+    try {
+      if (!isRefresh) setState(prev => ({ ...prev, loading: true }));
+      const response = await api.get(`/posts/${route.params.slug}`);
+      setState({ item: response.data.data.item, loading: false, error: '' });
+    } catch (error) {
+      setState(prev => ({ ...prev, loading: false, error: error.message }));
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    let live = true;
-    api.get(`/posts/${route.params.slug}`)
-      .then(response => live && setState({ item: response.data.data.item, loading: false, error: '' }))
-      .catch(error => live && setState({ item: null, loading: false, error: error.message }));
-    return () => { live = false; };
+    loadPost();
   }, [route.params.slug]);
 
-  if (state.loading) return <Page><StateMessage title="Đang tải bài viết" loading /></Page>;
-  if (state.error || !state.item) return <Page><StateMessage title="Không thể mở bài viết" message={state.error} /></Page>;
+  if (state.loading && !refreshing) return <Page><StateMessage title="Đang tải bài viết" loading /></Page>;
+  if (state.error || !state.item) return <Page><StateMessage title="Không thể mở bài viết" message={state.error} action="Tải lại" onAction={() => loadPost()} /></Page>;
 
   const post = state.item;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            loadPost(true);
+          }}
+          tintColor={theme.colors.ink}
+          colors={[theme.colors.ink]}
+        />
+      }
+    >
       {/* Header Info */}
       <View style={styles.metaRow}>
         <Text style={styles.eyebrow}>

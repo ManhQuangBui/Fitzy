@@ -24,28 +24,42 @@ const resourceConfig = {
     { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang bán'], ['hidden', 'Đã ẩn']] }, { key: 'featured', label: 'Sản phẩm nổi bật', kind: 'checkbox' }
   ] },
   categories: { singular: 'danh mục', path: '/admin/categories', columns: [{ key: 'name', label: 'Tên danh mục' }, { key: 'slug', label: 'Đường dẫn' }, { key: 'description', label: 'Mô tả' }, { key: 'status', label: 'Trạng thái', type: 'status' }, { key: 'createdAt', label: 'Ngày tạo', type: 'date' }], fields: [{ key: 'name', label: 'Tên danh mục', required: true }, { key: 'description', label: 'Mô tả', multiline: true }, { key: 'image', label: 'Ảnh URL' }, { key: 'status', label: 'Trạng thái', kind: 'select', options: [['active', 'Đang hoạt động'], ['hidden', 'Đã ẩn']] }] },
-  posts: { singular: 'bài viết', path: '/admin/posts', columns: [
-    { key: 'image', label: 'Ảnh', render: row => row.image ? <img className="product-thumb" src={row.image} alt={row.title} /> : '—' },
-    { key: 'title', label: 'Tiêu đề' }, 
-    { key: 'category', label: 'Chuyên mục' },
-    { key: 'status', label: 'Trạng thái', type: 'status' }, 
-    { key: 'publishedAt', label: 'Ngày đăng', type: 'date' }
-  ], fields: [
-    { key: 'title', label: 'Tiêu đề', required: true }, 
-    { key: 'excerpt', label: 'Tóm tắt', multiline: true }, 
-    { key: 'content', label: 'Nội dung', multiline: true, required: true }, 
-    { key: 'category', label: 'Chuyên mục', kind: 'select', options: [
-      ['Phối đồ hàng ngày', 'Phối đồ hàng ngày'],
-      ['Xu hướng mới', 'Xu hướng mới'],
-      ['Chăm sóc vải', 'Chăm sóc vải'],
-      ['Màu sắc & Chất liệu', 'Màu sắc & Chất liệu']
-    ]},
-    { key: 'badge', label: 'Huy hiệu / Tag nổi bật' },
-    { key: 'image', label: 'Ảnh đại diện', kind: 'singleImage' }, 
-    { key: 'relatedProducts', label: 'Gắn thẻ sản phẩm vào bài viết (Shoppable Outfit)', kind: 'productTags' },
-    { key: 'isEditorialPick', label: 'Đặt làm TIÊU ĐIỂM TUẦN NÀY (Hero Card)', kind: 'checkbox' },
-    { key: 'status', label: 'Trạng thái', kind: 'select', options: [['draft', 'Bản nháp'], ['published', 'Xuất bản']] }
-  ] },
+    posts: {
+        singular: 'bài viết',
+        path: '/admin/posts',
+        columns: [
+            { key: 'image', label: 'Ảnh', render: row => row.image ? <img className="product-thumb" src={row.image} alt={row.title} /> : '—' },
+            { key: 'title', label: 'Tiêu đề' },
+            { key: 'category', label: 'Chuyên mục' },
+            { key: 'engagement', label: 'Tương tác', render: row => (
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>
+          👁️ {row.viewsCount || 0} · ❤️ {row.likesCount || 0}
+        </span>
+                )},
+            { key: 'isEditorialPick', label: 'Tiêu điểm', render: row => row.isEditorialPick ? <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>★ HERO</span> : '—' },
+            { key: 'status', label: 'Trạng thái', type: 'status' },
+            { key: 'publishedAt', label: 'Ngày đăng', type: 'date' }
+        ],
+        fields: [
+            { key: 'title', label: 'Tiêu đề bài viết', required: true },
+            { key: 'excerpt', label: 'Đoạn tóm tắt mở đầu', multiline: true },
+            { key: 'content', label: 'Nội dung bài viết (Markdown)', multiline: true, required: true },
+            { key: 'category', label: 'Chuyên mục', kind: 'select', options: [
+                    ['Phối đồ hàng ngày', 'Phối đồ hàng ngày'],
+                    ['Xu hướng mới', 'Xu hướng mới'],
+                    ['Chăm sóc vải', 'Chăm sóc vải'],
+                    ['Màu sắc & Chất liệu', 'Màu sắc & Chất liệu']
+                ]},
+            { key: 'badge', label: 'Huy hiệu nổi bật (Ví dụ: TRENDING, HOW-TO)' },
+            { key: 'readTime', label: 'Thời gian đọc (Ví dụ: 3 phút đọc)' },
+            { key: 'image', label: 'Ảnh bìa chính (Hero)', kind: 'singleImage' },
+            // [BỔ SUNG]: Trường chọn 2 ảnh lookbook ghép đôi
+            { key: 'spotlightImages', label: 'Bộ 2 ảnh Spotlight Outfit', kind: 'spotlightImages' },
+            { key: 'relatedProducts', label: 'Gắn thẻ sản phẩm vào bài viết (Shoppable Outfit)', kind: 'productTags' },
+            { key: 'isEditorialPick', label: 'Đặt làm TIÊU ĐIỂM TUẦN NÀY (Thẻ lớn trên cùng)', kind: 'checkbox' },
+            { key: 'status', label: 'Trạng thái bài viết', kind: 'select', options: [['draft', 'Bản nháp'], ['published', 'Xuất bản']] }
+        ]
+    },
   promotions: { singular: 'mã ưu đãi', path: '/admin/promotions', columns: [{ key: 'code', label: 'Mã' }, { key: 'discountType', label: 'Loại giảm' }, { key: 'discountValue', label: 'Giá trị', render: row => row.discountType === 'percent' ? `${row.discountValue}%` : money(row.discountValue) }, { key: 'usedCount', label: 'Đã dùng' }, { key: 'endsAt', label: 'Hết hạn', type: 'date' }, { key: 'active', label: 'Trạng thái' }], fields: [{ key: 'code', label: 'Mã khuyến mãi', required: true }, { key: 'discountType', label: 'Kiểu giảm', kind: 'select', options: [['percent', 'Phần trăm'], ['fixed', 'Số tiền cố định']] }, { key: 'discountValue', label: 'Giá trị giảm', type: 'number', required: true }, { key: 'minimumOrder', label: 'Đơn tối thiểu', type: 'number' }, { key: 'maximumDiscount', label: 'Giảm tối đa', type: 'number' }, { key: 'startsAt', label: 'Bắt đầu', type: 'datetime-local', required: true }, { key: 'endsAt', label: 'Kết thúc', type: 'datetime-local', required: true }, { key: 'usageLimit', label: 'Lượt sử dụng tối đa', type: 'number' }, { key: 'active', label: 'Đang kích hoạt', kind: 'checkbox' }] }
 };
 
@@ -57,6 +71,7 @@ function initialDraft(config, row) {
     const value = row?.[field.key];
     if (field.kind === 'variantList') result[field.key] = value?.length ? value.map(variant => ({ ...variant, quantity: String(variant.quantity) })) : [defaultVariant()];
     else if (field.kind === 'imageList') result[field.key] = Array.isArray(value) ? [...value] : [];
+    else if (field.kind === 'spotlightImages') result[field.key] = Array.isArray(value) ? [...value] : [];
     else if (field.kind === 'productTags') result[field.key] = Array.isArray(value) ? value.map(p => p._id || p) : [];
     else if (field.type === 'datetime-local') result[field.key] = dateForInput(value);
     else result[field.key] = value ?? (field.kind === 'checkbox' ? field.key === 'active' : field.key === 'status' ? 'active' : '');
@@ -68,6 +83,7 @@ function mapDraft(config, draft) {
   config.fields.forEach(field => {
     if (field.kind === 'variantList') result[field.key] = draft[field.key].map(variant => ({ ...variant, size: variant.size.trim(), color: variant.color.trim(), sku: variant.sku?.trim() || '', quantity: Number(variant.quantity) }));
     else if (field.kind === 'imageList') result[field.key] = draft[field.key].filter(Boolean);
+    else if (field.kind === 'spotlightImages') result[field.key] = Array.isArray(draft[field.key]) ? draft[field.key].filter(Boolean).slice(0, 2) : [];
     else if (field.kind === 'productTags') result[field.key] = Array.isArray(draft[field.key]) ? draft[field.key] : [];
     else if (field.kind === 'category') result[field.key] = draft[field.key]?._id || draft[field.key];
     else if (field.type === 'number') result[field.key] = draft[field.key] === '' ? undefined : Number(draft[field.key]);
@@ -77,13 +93,16 @@ function mapDraft(config, draft) {
   return result;
 }
 
+
+const isAcceptedImage = file => ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/pjpeg', 'image/x-png'].includes(file?.type) || /\.(jpe?g|png|webp)$/i.test(file?.name || '');
+
 function ImageListEditor({ images, onChange, onError, onUploading }) {
   const [uploading, setUploading] = useState(false);
   const upload = async event => {
     const files = Array.from(event.target.files || []); event.target.value = '';
     if (!files.length) return;
     for (const file of files) {
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { onError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.'); return; }
+      if (!isAcceptedImage(file)) { onError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.'); return; }
       if (file.size > 4 * 1024 * 1024) { onError('Mỗi ảnh phải có dung lượng tối đa 4 MB.'); return; }
     }
     setUploading(true); onUploading(true); onError('');
@@ -97,16 +116,113 @@ function ImageListEditor({ images, onChange, onError, onUploading }) {
   const move = (index, offset) => { const target = index + offset; if (target < 0 || target >= images.length) return; const next = [...images]; [next[index], next[target]] = [next[target], next[index]]; onChange(next); };
   return <div className="product-images-editor">
     <div className="image-grid">{images.map((url, index) => <div className="image-preview" key={`${url}-${index}`}><img src={url} alt={`Ảnh sản phẩm ${index + 1}`} /><span>{index === 0 ? 'Ảnh đại diện' : `Ảnh ${index + 1}`}</span><div><button type="button" disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" disabled={index === images.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" onClick={() => onChange(images.filter((_, i) => i !== index))}>Xóa</button></div></div>)}</div>
-    <label className="upload-control">{uploading ? 'Đang tải ảnh…' : 'Thêm hình ảnh'}<input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={uploading} onChange={upload} /><small>JPG, PNG hoặc WebP · tối đa 4 MB/ảnh. Ảnh đầu tiên là ảnh đại diện. Xóa URL khỏi sản phẩm không xóa file lưu trữ.</small></label>
+    <label className="upload-control">{uploading ? 'Đang tải ảnh…' : 'Thêm hình ảnh'}<input type="file" accept="image/png,image/jpeg,image/webp,image/jpg" multiple disabled={uploading} onChange={upload} /><small>JPG, PNG hoặc WebP · tối đa 4 MB/ảnh. Ảnh đầu tiên là ảnh đại diện. Xóa URL khỏi sản phẩm không xóa file lưu trữ.</small></label>
   </div>;
 }
+function SpotlightImagesEditor({ images = [], onChange, onError, onUploading }) {
+    const [uploading, setUploading] = useState(false);
 
+    const handleUpload = async (event, index) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        if (!isAcceptedImage(file)) {
+            onError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.');
+            return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+            onError('Dung lượng ảnh tối đa 4 MB.');
+            return;
+        }
+
+        setUploading(true);
+        onUploading(true);
+        onError('');
+        try {
+            const data = new FormData();
+            data.append('image', file);
+            const res = await api.post('/admin/uploads', data);
+            const next = [...images];
+            next[index] = res.data.data.url;
+            onChange(next.slice(0, 2));
+        } catch (err) {
+            onError(err.message);
+        } finally {
+            setUploading(false);
+            onUploading(false);
+        }
+    };
+
+    const handleRemove = (index) => {
+        const next = [...images];
+        next.splice(index, 1);
+        onChange(next);
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <small style={{ color: '#6b7280' }}>
+                Chọn tối đa 2 ảnh cho thẻ Spotlight Lookbook (Ảnh 1: Toàn thân, Ảnh 2: Chi tiết phụ kiện/chất liệu).
+            </small>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {[0, 1].map((idx) => {
+                    const url = images[idx];
+                    return (
+                        <div
+                            key={idx}
+                            style={{
+                                border: '1px dashed #d1d5db',
+                                borderRadius: 8,
+                                padding: 10,
+                                textAlign: 'center',
+                                backgroundColor: '#faf8f5',
+                                position: 'relative'
+                            }}
+                        >
+                            {url ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                    <img
+                                        src={url}
+                                        alt={`Spotlight ${idx + 1}`}
+                                        style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 6 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="button secondary small-button"
+                                        onClick={() => handleRemove(idx)}
+                                    >
+                                        Xóa ảnh {idx + 1}
+                                    </button>
+                                </div>
+                            ) : (
+                                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', padding: '24px 0' }}>
+                                    <span style={{ fontSize: 20 }}>📸</span>
+                                    <span style={{ fontSize: 12, fontWeight: '600', color: '#8c7d70', marginTop: 4 }}>
+                    {uploading ? 'Đang tải…' : `+ Tải ảnh ${idx + 1}`}
+                  </span>
+                                    <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/webp"
+                                        disabled={uploading}
+                                        onChange={(e) => handleUpload(e, idx)}
+                                        style={{ display: 'none' }}
+                                    />
+                                </label>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 function SingleImageEditor({ value, onChange, onError, onUploading }) {
   const [uploading, setUploading] = useState(false);
   const upload = async event => {
     const file = event.target.files?.[0]; event.target.value = '';
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { onError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.'); return; }
+    if (!isAcceptedImage(file)) { onError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.'); return; }
     if (file.size > 4 * 1024 * 1024) { onError('Ảnh tối đa 4 MB.'); return; }
     setUploading(true); onUploading(true); onError('');
     try {
@@ -121,7 +237,7 @@ function SingleImageEditor({ value, onChange, onError, onUploading }) {
       <input className="input" placeholder="Dán link ảnh (https://...) hoặc tải ảnh từ máy" value={value || ''} onChange={e => onChange(e.target.value)} style={{ flex: 1 }} />
       <label className="button secondary" style={{ margin: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}>
         {uploading ? 'Đang tải…' : '📁 Tải ảnh'}
-        <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={upload} style={{ display: 'none' }} />
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/jpg" disabled={uploading} onChange={upload} style={{ display: 'none' }} />
       </label>
     </div>
     {value ? <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -167,6 +283,54 @@ function VariantEditor({ variants, onChange }) {
   </div>;
 }
 
+function MarkdownToolbar({ value, onChange, onAutoReadTime }) {
+  const insertSnippet = (prefix, suffix = '', placeholder = '') => {
+    const textarea = document.querySelector('textarea.input.textarea');
+    if (!textarea) {
+      onChange((value || '') + prefix + placeholder + suffix);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = (value || '').substring(start, end) || placeholder;
+    const replacement = `${prefix}${selected}${suffix}`;
+    const next = (value || '').substring(0, start) + replacement + (value || '').substring(end);
+    onChange(next);
+  };
+
+  const wordCount = (value || '').trim().split(/\s+/).filter(Boolean).length;
+  const estimatedReadTime = `${Math.max(1, Math.ceil(wordCount / 180))} phút đọc`;
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button type="button" className="button secondary small-button" title="In đậm" onClick={() => insertSnippet('**', '**', 'chữ đậm')}><b>B</b></button>
+        <button type="button" className="button secondary small-button" title="In nghiêng" onClick={() => insertSnippet('*', '*', 'chữ nghiêng')}><i>I</i></button>
+        <button type="button" className="button secondary small-button" title="Tiêu đề H2" onClick={() => insertSnippet('\n## ', '\n', 'Tiêu đề phân đoạn')}>H2</button>
+        <button type="button" className="button secondary small-button" title="Trích dẫn" onClick={() => insertSnippet('\n> ', '\n', 'Lời khuyên styling...')}>” Quote</button>
+        <button type="button" className="button secondary small-button" title="Danh sách" onClick={() => insertSnippet('\n- ', '', 'Mẹo phối đồ')}>• List</button>
+        <button type="button" className="button secondary small-button" title="Chèn ảnh" onClick={() => insertSnippet('\n![Mô tả ảnh](', ')', 'https://...')}>🖼️ Ảnh</button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <small style={{ color: '#8c7d70' }}>
+          {wordCount} từ · <b>{estimatedReadTime}</b>
+        </small>
+        {onAutoReadTime ? (
+          <button
+            type="button"
+            className="button secondary small-button"
+            style={{ fontSize: 11, padding: '2px 8px' }}
+            onClick={() => onAutoReadTime(estimatedReadTime)}
+            title="Áp dụng thời gian đọc này vào bài viết"
+          >
+            Áp dụng
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function FormModal({ section, config, row, onClose, onSave }) {
   const [draft, setDraft] = useState(() => initialDraft(config, row)); const [busy, setBusy] = useState(false); const [uploading, setUploading] = useState(false); const [error, setError] = useState(''); const [categories, setCategories] = useState([]); const [productsList, setProductsList] = useState([]);
   useEffect(() => { 
@@ -189,7 +353,7 @@ function FormModal({ section, config, row, onClose, onSave }) {
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
-  return <Modal title={`${row ? 'Chỉnh sửa' : 'Thêm'} ${config.singular}`} onClose={onClose}><form className="admin-form" onSubmit={save}><div className="form-grid">{config.fields.map(field => <div key={field.key} className={`field ${field.multiline || field.kind === 'variantList' || field.kind === 'imageList' || field.kind === 'singleImage' || field.kind === 'productTags' ? 'wide' : ''}`}><span>{field.label}{field.required ? ' *' : ''}</span>{field.kind === 'imageList' ? <ImageListEditor images={draft.images} onChange={images => setDraft(current => ({ ...current, images }))} onError={setError} onUploading={setUploading} /> : field.kind === 'singleImage' ? <SingleImageEditor value={draft[field.key]} onChange={val => setDraft(current => ({ ...current, [field.key]: val }))} onError={setError} onUploading={setUploading} /> : field.kind === 'productTags' ? <ProductTagSelector value={draft[field.key]} onChange={val => setDraft(current => ({ ...current, [field.key]: val }))} products={productsList} /> : field.kind === 'variantList' ? <VariantEditor variants={draft.variants} onChange={variants => setDraft(current => ({ ...current, variants }))} /> : field.kind === 'select' ? <select className="input" value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })}>{field.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : field.kind === 'category' ? <select className="input" value={draft[field.key]?._id || draft[field.key] || ''} onChange={event => setDraft({ ...draft, category: event.target.value })} required><option value="">Chọn danh mục</option>{categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}</select> : field.kind === 'checkbox' ? <span className="checkbox-field"><input type="checkbox" checked={Boolean(draft[field.key])} onChange={event => setDraft({ ...draft, [field.key]: event.target.checked })} /> Bật</span> : field.multiline ? <textarea className="input textarea" required={field.required} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} rows={4} /> : <input className="input" required={field.required} type={field.type || 'text'} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} min={field.type === 'number' ? '0' : undefined} />}</div>)}</div>{error ? <div className="inline-error">{error}</div> : null}<div className="form-actions"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button type="submit" className="button primary" disabled={busy || uploading}>{uploading ? 'Đang tải ảnh…' : busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div></form></Modal>;
+  return <Modal title={`${row ? 'Chỉnh sửa' : 'Thêm'} ${config.singular}`} onClose={onClose}><form className="admin-form" onSubmit={save}><div className="form-grid">{config.fields.map(field => <div key={field.key} className={`field ${field.multiline || field.kind === 'variantList' || field.kind === 'imageList' || field.kind === 'singleImage' || field.kind === 'productTags' || field.kind === 'spotlightImages' ? 'wide' : ''}`}><span>{field.label}{field.required ? ' *' : ''}</span>{field.kind === 'imageList' ? <ImageListEditor images={draft.images} onChange={images => setDraft(current => ({ ...current, images }))} onError={setError} onUploading={setUploading} /> : field.kind === 'singleImage' ? <SingleImageEditor value={draft[field.key]} onChange={val => setDraft(current => ({ ...current, [field.key]: val }))} onError={setError} onUploading={setUploading} /> : field.kind === 'spotlightImages' ? <SpotlightImagesEditor images={draft[field.key] || []} onChange={imgs => setDraft(current => ({ ...current, [field.key]: imgs }))} onError={setError} onUploading={setUploading} /> : field.kind === 'productTags' ? <ProductTagSelector value={draft[field.key]} onChange={val => setDraft(current => ({ ...current, [field.key]: val }))} products={productsList} /> : field.kind === 'variantList' ? <VariantEditor variants={draft.variants} onChange={variants => setDraft(current => ({ ...current, variants }))} /> : field.kind === 'select' ? <select className="input" value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })}>{field.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : field.kind === 'category' ? <select className="input" value={draft[field.key]?._id || draft[field.key] || ''} onChange={event => setDraft({ ...draft, category: event.target.value })} required><option value="">Chọn danh mục</option>{categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}</select> : field.kind === 'checkbox' ? <span className="checkbox-field"><input type="checkbox" checked={Boolean(draft[field.key])} onChange={event => setDraft({ ...draft, [field.key]: event.target.checked })} /> Bật</span> : field.multiline ? <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>{field.key === 'content' && section === 'posts' ? <MarkdownToolbar value={draft[field.key] || ''} onChange={val => setDraft(c => ({ ...c, [field.key]: val }))} onAutoReadTime={t => { if (!draft.readTime) setDraft(c => ({ ...c, readTime: t })); }} /> : null}<textarea className="input textarea" required={field.required} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} rows={field.key === 'content' ? 8 : 4} /></div> : <input className="input" required={field.required} type={field.type || 'text'} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: event.target.value })} min={field.type === 'number' ? '0' : undefined} />}</div>)}</div>{error ? <div className="inline-error">{error}</div> : null}<div className="form-actions"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button type="submit" className="button primary" disabled={busy || uploading}>{uploading ? 'Đang tải ảnh…' : busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div></form></Modal>;
 }
 
 function ActivityModal({ product, onClose }) {
@@ -199,9 +363,92 @@ function ActivityModal({ product, onClose }) {
   return <Modal title={`Nhật ký · ${product.name}`} onClose={onClose}><div className="activity-list">{state.loading ? <p>Đang tải nhật ký…</p> : state.error ? <div className="inline-error">{state.error}</div> : state.items.length ? state.items.map(item => <article className="activity-item" key={item._id}><div><b>{labels[item.action] || item.action}</b><span>{item.actor?.name || item.actor?.email || 'Admin'} · {new Date(item.createdAt).toLocaleString('vi-VN')}</span></div>{item.changes?.map((change, index) => <p key={`${change.field}-${index}`}>{change.field === 'inventory' ? `SKU ${change.sku || '—'}: ${change.before ?? 0} → ${change.after ?? 0}` : `${change.field}: ${JSON.stringify(change.before ?? '—')} → ${JSON.stringify(change.after ?? '—')}`}</p>)}{item.reason ? <small>Lý do: {item.reason}</small> : null}</article>) : <p>Chưa có thao tác được ghi nhận.</p>}</div></Modal>;
 }
 
+function MobilePreviewModal({ post, onClose }) {
+  if (!post) return null;
+  const paragraphs = (post.content || '').split('\n').filter(Boolean);
+
+  return (
+    <Modal title={`Xem trước: ${post.title}`} onClose={onClose}>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
+        <div style={{
+          width: 360,
+          maxHeight: 600,
+          overflowY: 'auto',
+          backgroundColor: '#faf8f5',
+          borderRadius: 28,
+          border: '8px solid #1f2937',
+          boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+
+          <div style={{ padding: '12px 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ece5db' }}>
+            <span style={{ fontSize: 10, letterSpacing: 1.5, color: '#8c7d70', fontWeight: '800' }}>FITZY · JOURNAL</span>
+            <span style={{ fontSize: 11, color: '#9ca3af' }}>{post.readTime || '4 phút đọc'}</span>
+          </div>
+
+
+          {post.image ? (
+            <div style={{ width: '100%', height: 200, position: 'relative' }}>
+              <img src={post.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {post.badge ? (
+                <span style={{ position: 'absolute', top: 10, left: 10, backgroundColor: '#ffffff', borderRadius: 99, padding: '3px 10px', fontSize: 10, fontWeight: '800', color: '#181818' }}>
+                  {post.badge}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: '800', color: '#b8944d', letterSpacing: 1 }}>
+              {(post.category || 'PHỐI ĐỒ').toUpperCase()}
+            </span>
+
+            <h2 style={{ fontSize: 18, fontWeight: '800', color: '#181818', lineHeight: 1.3, margin: 0 }}>
+              {post.title}
+            </h2>
+
+            {post.excerpt ? (
+              <p style={{ fontSize: 13, color: '#6b7280', fontStyle: 'italic', margin: 0, borderLeft: '3px solid #b8944d', paddingLeft: 8 }}>
+                {post.excerpt}
+              </p>
+            ) : null}
+
+
+            {post.spotlightImages?.length ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
+                {post.spotlightImages.slice(0, 2).map((imgUrl, i) => (
+                  <img key={i} src={imgUrl} alt="" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 10 }} />
+                ))}
+              </div>
+            ) : null}
+
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              {paragraphs.map((p, idx) => {
+                if (p.startsWith('## ')) return <h3 key={idx} style={{ fontSize: 15, fontWeight: '700', margin: '8px 0 2px', color: '#181818' }}>{p.replace('## ', '')}</h3>;
+                if (p.startsWith('> ')) return <blockquote key={idx} style={{ margin: 0, padding: '8px 12px', backgroundColor: '#f4ede4', borderRadius: 8, fontStyle: 'italic', fontSize: 12, color: '#574d43' }}>{p.replace('> ', '')}</blockquote>;
+                return <p key={idx} style={{ fontSize: 12.5, lineHeight: 1.6, color: '#374151', margin: 0 }}>{p}</p>;
+              })}
+            </div>
+
+            {/* Sản phẩm trong bài viết */}
+            {post.relatedProducts?.length ? (
+              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 10, marginTop: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: '700', color: '#181818' }}>🛍️ SẢN PHẨM TRONG BÀI VIẾT</span>
+                <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 6 }}>({post.relatedProducts.length} món)</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function CollectionPage({ section }) {
-  const config = resourceConfig[section]; const [page, setPage] = useState(1); const [query, setQuery] = useState(''); const [search, setSearch] = useState(''); const [category, setCategory] = useState(''); const [status, setStatus] = useState(''); const [categories, setCategories] = useState([]); const [modalRow, setModalRow] = useState(undefined); const [deleteRow, setDeleteRow] = useState(null); const [activityRow, setActivityRow] = useState(null); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState('');
-  const params = useMemo(() => ({ page, limit: 12, q: search || undefined, ...(section === 'products' ? { category: category || undefined, status: status || undefined } : {}) }), [page, search, section, category, status]);
+  const config = resourceConfig[section]; const [page, setPage] = useState(1); const [query, setQuery] = useState(''); const [search, setSearch] = useState(''); const [category, setCategory] = useState(''); const [status, setStatus] = useState(''); const [categories, setCategories] = useState([]); const [modalRow, setModalRow] = useState(undefined); const [deleteRow, setDeleteRow] = useState(null); const [activityRow, setActivityRow] = useState(null); const [previewRow, setPreviewRow] = useState(null); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState('');
+  const params = useMemo(() => ({ page, limit: 12, q: search || undefined, ...(section === 'products' || section === 'posts' ? { category: category || undefined, status: status || undefined } : {}) }), [page, search, section, category, status]);
   const { items, pagination, loading, error, refresh } = useResource(config.path, params);
   useEffect(() => { if (section === 'products') api.get('/admin/categories', { params: { limit: 100 } }).then(response => setCategories(response.data.data.items || [])).catch(() => {}); }, [section]);
   const save = async body => { if (modalRow) await api.patch(`${config.path}/${modalRow._id}`, body); else await api.post(config.path, body); setModalRow(undefined); setNotice('Đã lưu thay đổi.'); refresh(); };
@@ -209,10 +456,10 @@ export default function CollectionPage({ section }) {
   const handleSearch = event => { event.preventDefault(); setPage(1); setSearch(query.trim()); };
   return <div className="page-stack"><div className="page-heading"><div><span className="eyebrow">QUẢN LÝ CỬA HÀNG</span><h1>{title(section)}</h1><p>Quản lý và cập nhật dữ liệu {config.singular} FITZY.</p></div><button className="button primary" onClick={() => setModalRow(null)}><span>＋</span> Thêm {config.singular}</button></div>
     {notice ? <div className="notice-bar">{notice}<button onClick={() => setNotice('')}>×</button></div> : null}
-    <section className="panel data-panel"><div className="table-toolbar"><form className="search-form" onSubmit={handleSearch}><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Tìm ${config.singular}…`} /><button type="submit" className="button secondary">Tìm</button></form>{section === 'products' ? <div className="product-filters"><select aria-label="Lọc theo danh mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}><option value="">Tất cả danh mục</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select><select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}><option value="">Mọi trạng thái</option><option value="active">Đang bán</option><option value="hidden">Đã ẩn</option></select></div> : null}<div className="toolbar-meta">{pagination ? `${pagination.total} bản ghi` : 'FITZY'}</div></div>
-      <DataTable columns={config.columns} rows={items} loading={loading} error={error} onRetry={refresh} empty={`Chưa có ${config.singular}`} renderActions={row => <>{section === 'products' ? <button className="table-action" onClick={() => setActivityRow(row)}>Nhật ký</button> : null}<button className="table-action" onClick={() => setModalRow(row)}>Sửa</button><button className="table-action danger-text" onClick={() => setDeleteRow(row)}>Xóa / ẩn</button></>} />
+    <section className="panel data-panel"><div className="table-toolbar"><form className="search-form" onSubmit={handleSearch}><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Tìm ${config.singular}…`} /><button type="submit" className="button secondary">Tìm</button></form>{section === 'products' ? <div className="product-filters"><select aria-label="Lọc theo danh mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}><option value="">Tất cả danh mục</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select><select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}><option value="">Mọi trạng thái</option><option value="active">Đang bán</option><option value="hidden">Đã ẩn</option></select></div> : null}{section === 'posts' ? <div className="product-filters"><select aria-label="Lọc theo chuyên mục" className="select-control" value={category} onChange={event => { setPage(1); setCategory(event.target.value); }}><option value="">Tất cả chuyên mục</option><option value="Phối đồ hàng ngày">Phối đồ hàng ngày</option><option value="Xu hướng mới">Xu hướng mới</option><option value="Chăm sóc vải">Chăm sóc vải</option><option value="Màu sắc & Chất liệu">Màu sắc & Chất liệu</option></select><select aria-label="Lọc theo trạng thái" className="select-control" value={status} onChange={event => { setPage(1); setStatus(event.target.value); }}><option value="">Mọi trạng thái</option><option value="published">Đã xuất bản</option><option value="draft">Bản nháp</option></select></div> : null}<div className="toolbar-meta">{pagination ? `${pagination.total} bản ghi` : 'FITZY'}</div></div>
+      <DataTable columns={config.columns} rows={items} loading={loading} error={error} onRetry={refresh} empty={`Chưa có ${config.singular}`} renderActions={row => <>{section === 'products' ? <button className="table-action" onClick={() => setActivityRow(row)}>Nhật ký</button> : null}{section === 'posts' ? <button className="table-action" onClick={() => setPreviewRow(row)}>Xem trước</button> : null}<button className="table-action" onClick={() => setModalRow(row)}>Sửa</button><button className="table-action danger-text" onClick={() => setDeleteRow(row)}>Xóa / ẩn</button></>} />
       {pagination?.pages > 1 ? <div className="pagination"><span>Trang {pagination.page} / {pagination.pages}</span><div><button className="button secondary small-button" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>Trước</button><button className="button secondary small-button" disabled={page >= pagination.pages} onClick={() => setPage(value => value + 1)}>Sau</button></div></div> : null}
     </section>
-    {modalRow !== undefined ? <FormModal section={section} config={config} row={modalRow || null} onClose={() => setModalRow(undefined)} onSave={save} /> : null}{deleteRow ? <ConfirmDialog title={section === 'products' ? 'Ẩn sản phẩm?' : 'Xóa bản ghi?'} message={section === 'products' ? `“${deleteRow.name}” sẽ bị ẩn khỏi cửa hàng.` : `Bạn sắp xóa “${deleteRow.name || deleteRow.title || deleteRow.code}”. Một số tài nguyên đã sử dụng có thể bị từ chối xóa.`} onCancel={() => setDeleteRow(null)} onConfirm={remove} busy={busy} /> : null}{activityRow ? <ActivityModal product={activityRow} onClose={() => setActivityRow(null)} /> : null}
+    {modalRow !== undefined ? <FormModal section={section} config={config} row={modalRow || null} onClose={() => setModalRow(undefined)} onSave={save} /> : null}{deleteRow ? <ConfirmDialog title={section === 'products' ? 'Ẩn sản phẩm?' : 'Xóa bản ghi?'} message={section === 'products' ? `“${deleteRow.name}” sẽ bị ẩn khỏi cửa hàng.` : `Bạn sắp xóa “${deleteRow.name || deleteRow.title || deleteRow.code}”. Một số tài nguyên đã sử dụng có thể bị từ chối xóa.`} onCancel={() => setDeleteRow(null)} onConfirm={remove} busy={busy} /> : null}{activityRow ? <ActivityModal product={activityRow} onClose={() => setActivityRow(null)} /> : null}{previewRow ? <MobilePreviewModal post={previewRow} onClose={() => setPreviewRow(null)} /> : null}
   </div>;
 }

@@ -18,7 +18,7 @@ import { fetchProduct } from '../../store/slices/productSlice';
 import { addItem } from '../../store/slices/cartSlice';
 import { addFavorite, fetchFavorites, removeFavorite } from '../../store/slices/favoriteSlice';
 import { StateMessage } from '../../components/ui';
-import { theme, formatVnd } from '../../constants/theme';
+import { theme, formatVnd, resolveImageUrl } from '../../constants/theme';
 
 function getInitials(name) {
   if (!name) return 'KH';
@@ -148,9 +148,28 @@ export default function ProductScreen({ route, navigation }) {
   const avgRatingText = reviewCount > 0 ? avgRatingNum.toFixed(1) : '0.0';
 
 
+  // Chuẩn hóa nhãn giới tính từ tags: Ưu tiên UNISEX -> NỮ -> NAM
+  const getGenderLabel = (tags = []) => {
+    if (!Array.isArray(tags) || tags.length === 0) return null;
+    const lower = tags.map(t => String(t).toLowerCase().trim());
+    if (lower.includes('unisex')) return 'UNISEX';
+    if (lower.includes('nu') || lower.includes('nữ')) return 'NỮ';
+    if (lower.includes('nam')) return 'NAM';
+    return null;
+  };
+
   const categoryName = (product.category?.name || 'PHỤ KIỆN').toUpperCase();
-  const productTag = product.tags?.[0] || 'MỚI VỀ';
+  const genderLabel = getGenderLabel(product.tags);
+  const categoryDisplay = genderLabel ? `${categoryName} · ${genderLabel}` : categoryName;
   const displayImage = variant?.images?.[0] || product.images?.[0];
+
+  // Tính phần trăm giảm giá (nếu có giá niêm yết cũ)
+  const hasDiscount = Boolean(
+    product.compareAtPrice && product.compareAtPrice > product.price
+  );
+  const discountPercent = hasDiscount
+    ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
+    : 0;
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.safeArea}>
@@ -164,13 +183,16 @@ export default function ProductScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
       >
 
+        {/* Hero Image Box: Loại bỏ tag giới tính thô đè trên ảnh, chỉ hiện badge sale nếu có giảm giá */}
         <View style={styles.heroImageBox}>
-          <View style={styles.badgePill}>
-            <Text style={styles.badgePillText}>{productTag}</Text>
-          </View>
+          {hasDiscount ? (
+            <View style={styles.badgePill}>
+              <Text style={styles.badgePillText}>-{discountPercent}%</Text>
+            </View>
+          ) : null}
           {displayImage ? (
             <Image
-              source={{ uri: displayImage }}
+              source={{ uri: resolveImageUrl(displayImage) }}
               resizeMode="cover"
               style={styles.productImage}
             />
@@ -184,8 +206,9 @@ export default function ProductScreen({ route, navigation }) {
 
         <View style={styles.infoCard}>
 
+          {/* Phân loại danh mục kèm giới tính chuẩn hóa: DANH MỤC · UNISEX / NAM / NỮ */}
           <View style={styles.metaRow}>
-            <Text style={styles.categoryText}>{categoryName}</Text>
+            <Text style={styles.categoryText}>{categoryDisplay}</Text>
             <View style={styles.ratingSummaryRow}>
               {reviewCount > 0 ? (
                 <>

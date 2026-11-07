@@ -12,3 +12,4 @@ FITZY-API/uploads/*
 .DS_Store
 *.log
 .idea/
+docs/GEMINI.md

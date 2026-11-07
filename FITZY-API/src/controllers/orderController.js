@@ -94,8 +94,9 @@ const vnPayReturn = asyncHandler(async (req, res) => {
       <div class="info-row"><span>Mã giao dịch:</span> <span>${req.query.vnp_TransactionNo || '—'}</span></div>
       <div class="info-row"><span>Trạng thái:</span> <span style="color:${isSuccess ? '#059669' : '#dc2626'};">${isSuccess ? 'ĐÃ THANH TOÁN' : 'THẤT BẠI'}</span></div>
     </div>
+    const adminWebUrl = process.env.ADMIN_URL || 'http://localhost:5173';
     <a href="${appRedirectUrl}" class="btn btn-primary">Mở ứng dụng FITZY</a>
-    <a href="http://localhost:5173" class="btn btn-secondary">Xem quản trị đơn hàng (Web Admin)</a>
+    <a href="${adminWebUrl}" class="btn btn-secondary">Xem quản trị đơn hàng (Web Admin)</a>
     <div class="notice">Hệ thống đang tự động điều hướng về ứng dụng FITZY…</div>
   </div>
 </body>

@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../constants/theme';
+import { theme, resolveImageUrl } from '../../constants/theme';
 import api from '../../services/api';
 
 const CATEGORIES = [
@@ -28,21 +30,10 @@ const CATEGORY_ICONS = {
   'Màu sắc & Chất liệu': '🎨 ',
 };
 
-const resolveImageUrl = (url) => {
-  if (!url) return '';
-  const apiHost = (process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:4000/api').replace(/\/api\/?$/, '');
-  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
-    return url.replace(/^http:\/\/(localhost|127\.0\.0\.1):4000/, apiHost);
-  }
-  if (!url.startsWith('http')) {
-    return `${apiHost}${url.startsWith('/') ? '' : '/'}${url}`;
-  }
-  return url;
-};
-
 export default function PostsScreen({ navigation }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả bài viết');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -52,16 +43,22 @@ export default function PostsScreen({ navigation }) {
   const [subscriberEmail, setSubscriberEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
-  const loadPosts = async () => {
+  const loadPosts = async (isPullToRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isPullToRefresh) setLoading(true);
       const res = await api.get('/posts', { params: { limit: 20 } });
       setPosts(res.data?.data?.items || []);
     } catch (err) {
       console.warn('Lỗi tải bài viết:', err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadPosts(true);
   };
 
   useEffect(() => {
@@ -116,7 +113,6 @@ export default function PostsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* 1. Custom Navigation Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.iconButton} hitSlop={12}>
           <Ionicons name="arrow-back" size={22} color={theme.colors.ink} />
@@ -175,6 +171,14 @@ export default function PostsScreen({ navigation }) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.ink}
+            colors={[theme.colors.ink]}
+          />
+        }
       >
         {/* 2. Tiêu điểm tuần này (Hero Editorial Card) */}
         {!showBookmarksOnly && editorialPost && (
@@ -264,7 +268,17 @@ export default function PostsScreen({ navigation }) {
           </View>
 
           <View style={styles.articlesList}>
-            {regularPosts.map((post) => {
+            {regularPosts.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="document-text-outline" size={36} color="#a1a1aa" />
+                <Text style={styles.emptyTitle}>
+                  {loading ? 'Đang cập nhật bài viết...' : 'Không có bài viết phù hợp'}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {loading ? 'Vui lòng chờ giây lát' : 'Vuốt xuống để tải lại nội dung mới nhất.'}
+                </Text>
+              </View>
+            ) : regularPosts.map((post) => {
               const isLiked = likedPosts.has(post._id);
               const isBookmarked = bookmarkedPosts.has(post._id);
 
@@ -407,7 +421,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 52,
+    paddingTop: 10,
     paddingBottom: 14,
     backgroundColor: '#fbfaf8',
   },
@@ -824,5 +838,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#181818',
+  },
+  emptyContainer: {
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#eee8dd',
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#181818',
+  },
+  emptySub: {
+    fontSize: 12,
+    color: '#8c7d70',
+    textAlign: 'center',
   },
 });
