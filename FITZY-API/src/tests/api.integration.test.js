@@ -707,3 +707,21 @@ test('public post API only returns published posts that are already live', async
   assert.equal((await request(app).patch(`/api/admin/posts/${draft._id}`).set(adminAuth()).send({ status: 'published' })).status, 200);
   assert.ok((await slugs()).includes(draft.slug));
 });
+
+test('review and post admin routes reject anonymous and customer tokens; reviews stay owner-only', async () => {
+  const review = await createReview('owner@test.fitzy');
+  const customer = { Authorization: `Bearer ${customerToken}` };
+  const routes = [
+    ['get', '/api/reviews/admin/list'],
+    ['patch', `/api/reviews/${review._id}/moderate`, { status: 'hidden' }],
+    ['patch', `/api/reviews/${review._id}/reply`, { reply: 'Hi' }],
+    ['post', '/api/admin/posts', { title: 'Nope', content: 'Nope' }]
+  ];
+  for (const [method, url, body] of routes) {
+    assert.equal((await request(app)[method](url).send(body)).status, 401, `anonymous ${method} ${url}`);
+    assert.equal((await request(app)[method](url).set(customer).send(body)).status, 403, `customer ${method} ${url}`);
+  }
+  assert.equal((await request(app).patch(`/api/reviews/${review._id}`).set(customer).send({ comment: 'Hijack' })).status, 404);
+  assert.equal((await request(app).delete(`/api/reviews/${review._id}`).set(customer)).status, 404);
+  assert.equal((await mongoose.model('Review').findById(review._id)).comment, 'Great fit');
+});
