@@ -672,3 +672,19 @@ test('admin can hide and restore a review; customers only see visible reviews', 
   assert.ok((await publicIds()).includes(String(review._id)));
   assert.equal((await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'deleted' })).status, 400);
 });
+
+test('admin can reply to, edit and clear a review reply', async () => {
+  const review = await createReview('reply@test.fitzy');
+  const reply = text => request(app).patch(`/api/reviews/${review._id}/reply`).set(adminAuth()).send({ reply: text });
+  const added = await reply('  Thanks for your feedback  ');
+  assert.equal(added.status, 200);
+  assert.equal(added.body.data.review.adminReply, 'Thanks for your feedback');
+  assert.ok(added.body.data.review.repliedAt);
+  const publicReview = (await request(app).get(`/api/products/${product.id}`)).body.data.reviews.find(item => item._id === String(review._id));
+  assert.equal(publicReview.adminReply, 'Thanks for your feedback');
+  assert.equal((await reply('Updated answer')).body.data.review.adminReply, 'Updated answer');
+  const cleared = await reply('');
+  assert.equal(cleared.body.data.review.adminReply, '');
+  assert.equal(cleared.body.data.review.repliedAt, null);
+  assert.equal((await reply('x'.repeat(1201))).status, 400);
+});
