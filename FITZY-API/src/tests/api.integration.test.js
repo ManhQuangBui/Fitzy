@@ -649,3 +649,26 @@ test('admin order date filters use complete Vietnam calendar days regardless of 
     else process.env.TZ = previousTimezone;
   }
 });
+
+const adminAuth = () => ({ Authorization: `Bearer ${require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' })}` });
+async function createReview(email, overrides = {}) {
+  const reviewer = await mongoose.model('User').create({ name: 'Reviewer', email, passwordHash: 'not-a-login-hash' });
+  return mongoose.model('Review').create({ product: product._id, user: reviewer._id, order: new mongoose.Types.ObjectId(), rating: 5, comment: 'Great fit', ...overrides });
+}
+
+test('admin can hide and restore a review; customers only see visible reviews', async () => {
+  const review = await createReview('moderate@test.fitzy');
+  const publicIds = async () => (await request(app).get(`/api/products/${product.id}`)).body.data.reviews.map(item => item._id);
+  assert.ok((await publicIds()).includes(String(review._id)));
+  const hidden = await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'hidden' });
+  assert.equal(hidden.status, 200);
+  assert.equal(hidden.body.data.review.status, 'hidden');
+  assert.ok(!(await publicIds()).includes(String(review._id)));
+  const list = await request(app).get('/api/reviews/admin/list').query({ status: 'hidden' }).set(adminAuth());
+  assert.deepEqual(list.body.data.items.map(item => item._id), [String(review._id)]);
+  assert.equal(list.body.data.summary.hiddenCount, 1);
+  const restored = await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'visible' });
+  assert.equal(restored.body.data.review.status, 'visible');
+  assert.ok((await publicIds()).includes(String(review._id)));
+  assert.equal((await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'deleted' })).status, 400);
+});
