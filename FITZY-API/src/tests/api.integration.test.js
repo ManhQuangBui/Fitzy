@@ -649,3 +649,79 @@ test('admin order date filters use complete Vietnam calendar days regardless of 
     else process.env.TZ = previousTimezone;
   }
 });
+
+const adminAuth = () => ({ Authorization: `Bearer ${require('jsonwebtoken').sign({ sub: adminUser.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' })}` });
+async function createReview(email, overrides = {}) {
+  const reviewer = await mongoose.model('User').create({ name: 'Reviewer', email, passwordHash: 'not-a-login-hash' });
+  return mongoose.model('Review').create({ product: product._id, user: reviewer._id, order: new mongoose.Types.ObjectId(), rating: 5, comment: 'Great fit', ...overrides });
+}
+
+test('admin can hide and restore a review; customers only see visible reviews', async () => {
+  const review = await createReview('moderate@test.fitzy');
+  const publicIds = async () => (await request(app).get(`/api/products/${product.id}`)).body.data.reviews.map(item => item._id);
+  assert.ok((await publicIds()).includes(String(review._id)));
+  const hidden = await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'hidden' });
+  assert.equal(hidden.status, 200);
+  assert.equal(hidden.body.data.review.status, 'hidden');
+  assert.ok(!(await publicIds()).includes(String(review._id)));
+  const list = await request(app).get('/api/reviews/admin/list').query({ status: 'hidden' }).set(adminAuth());
+  assert.deepEqual(list.body.data.items.map(item => item._id), [String(review._id)]);
+  assert.equal(list.body.data.summary.hiddenCount, 1);
+  const restored = await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'visible' });
+  assert.equal(restored.body.data.review.status, 'visible');
+  assert.ok((await publicIds()).includes(String(review._id)));
+  assert.equal((await request(app).patch(`/api/reviews/${review._id}/moderate`).set(adminAuth()).send({ status: 'deleted' })).status, 400);
+});
+
+test('admin can reply to, edit and clear a review reply', async () => {
+  const review = await createReview('reply@test.fitzy');
+  const reply = text => request(app).patch(`/api/reviews/${review._id}/reply`).set(adminAuth()).send({ reply: text });
+  const added = await reply('  Thanks for your feedback  ');
+  assert.equal(added.status, 200);
+  assert.equal(added.body.data.review.adminReply, 'Thanks for your feedback');
+  assert.ok(added.body.data.review.repliedAt);
+  const publicReview = (await request(app).get(`/api/products/${product.id}`)).body.data.reviews.find(item => item._id === String(review._id));
+  assert.equal(publicReview.adminReply, 'Thanks for your feedback');
+  assert.equal((await reply('Updated answer')).body.data.review.adminReply, 'Updated answer');
+  const cleared = await reply('');
+  assert.equal(cleared.body.data.review.adminReply, '');
+  assert.equal(cleared.body.data.review.repliedAt, null);
+  assert.equal((await reply('x'.repeat(1201))).status, 400);
+});
+
+test('public post API only returns published posts that are already live', async () => {
+  const create = async (title, extra) => (await request(app).post('/api/admin/posts').set(adminAuth()).send({ title, content: 'Body text', ...extra })).body.data.item;
+  const live = await create('Live article', { status: 'published' });
+  const draft = await create('Draft article', { status: 'draft' });
+  const scheduled = await create('Scheduled article', { status: 'published', publishedAt: new Date(Date.now() + 86400000) });
+  const slugs = async () => (await request(app).get('/api/posts').query({ limit: 30 })).body.data.items.map(item => item.slug);
+  const listed = await slugs();
+  assert.ok(listed.includes(live.slug));
+  assert.ok(!listed.includes(draft.slug));
+  assert.ok(!listed.includes(scheduled.slug));
+  const detail = await request(app).get(`/api/posts/${live.slug}`);
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.data.item.content, 'Body text');
+  assert.equal((await request(app).get(`/api/posts/${draft.slug}`)).status, 404);
+  assert.equal((await request(app).get(`/api/posts/${scheduled.slug}`)).status, 404);
+  assert.equal((await request(app).patch(`/api/admin/posts/${draft._id}`).set(adminAuth()).send({ status: 'published' })).status, 200);
+  assert.ok((await slugs()).includes(draft.slug));
+});
+
+test('review and post admin routes reject anonymous and customer tokens; reviews stay owner-only', async () => {
+  const review = await createReview('owner@test.fitzy');
+  const customer = { Authorization: `Bearer ${customerToken}` };
+  const routes = [
+    ['get', '/api/reviews/admin/list'],
+    ['patch', `/api/reviews/${review._id}/moderate`, { status: 'hidden' }],
+    ['patch', `/api/reviews/${review._id}/reply`, { reply: 'Hi' }],
+    ['post', '/api/admin/posts', { title: 'Nope', content: 'Nope' }]
+  ];
+  for (const [method, url, body] of routes) {
+    assert.equal((await request(app)[method](url).send(body)).status, 401, `anonymous ${method} ${url}`);
+    assert.equal((await request(app)[method](url).set(customer).send(body)).status, 403, `customer ${method} ${url}`);
+  }
+  assert.equal((await request(app).patch(`/api/reviews/${review._id}`).set(customer).send({ comment: 'Hijack' })).status, 404);
+  assert.equal((await request(app).delete(`/api/reviews/${review._id}`).set(customer)).status, 404);
+  assert.equal((await mongoose.model('Review').findById(review._id)).comment, 'Great fit');
+});
