@@ -688,3 +688,22 @@ test('admin can reply to, edit and clear a review reply', async () => {
   assert.equal(cleared.body.data.review.repliedAt, null);
   assert.equal((await reply('x'.repeat(1201))).status, 400);
 });
+
+test('public post API only returns published posts that are already live', async () => {
+  const create = async (title, extra) => (await request(app).post('/api/admin/posts').set(adminAuth()).send({ title, content: 'Body text', ...extra })).body.data.item;
+  const live = await create('Live article', { status: 'published' });
+  const draft = await create('Draft article', { status: 'draft' });
+  const scheduled = await create('Scheduled article', { status: 'published', publishedAt: new Date(Date.now() + 86400000) });
+  const slugs = async () => (await request(app).get('/api/posts').query({ limit: 30 })).body.data.items.map(item => item.slug);
+  const listed = await slugs();
+  assert.ok(listed.includes(live.slug));
+  assert.ok(!listed.includes(draft.slug));
+  assert.ok(!listed.includes(scheduled.slug));
+  const detail = await request(app).get(`/api/posts/${live.slug}`);
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.data.item.content, 'Body text');
+  assert.equal((await request(app).get(`/api/posts/${draft.slug}`)).status, 404);
+  assert.equal((await request(app).get(`/api/posts/${scheduled.slug}`)).status, 404);
+  assert.equal((await request(app).patch(`/api/admin/posts/${draft._id}`).set(adminAuth()).send({ status: 'published' })).status, 200);
+  assert.ok((await slugs()).includes(draft.slug));
+});
