@@ -32,76 +32,33 @@ const zaloPayIpn = asyncHandler(async (req, res) => {
   res.status(200).json({ return_code: result.ok ? 1 : 2, return_message: result.ok ? 'Success' : 'Invalid' });
 });
 const vnPayIpn = asyncHandler(async (req, res) => {
-  const result = await paymentGatewayService.processVnPayCallback(req.query);
-  res.status(200).json({ RspCode: result.ok ? '00' : result.reason === 'ORDER_NOT_FOUND' ? '01' : '97', Message: result.ok ? 'Confirm Success' : 'Invalid signature or order' });
+  try {
+    const result = await paymentGatewayService.processVnPayCallback(req.query);
+    const errors = { ORDER_NOT_FOUND: ['01', 'Order not found'], AMOUNT_MISMATCH: ['04', 'Invalid amount'], INVALID_SIGNATURE: ['97', 'Invalid signature'], INVALID_MERCHANT: ['97', 'Invalid merchant'], INVALID_DATA: ['99', 'Invalid data'], ORDER_EXPIRED: ['02', 'Order expired'], ORDER_NOT_PAYABLE: ['02', 'Order already confirmed'] };
+    const [RspCode, Message] = result.ok ? (result.duplicate ? ['02', 'Order already confirmed'] : ['00', 'Confirm Success']) : (errors[result.reason] || ['99', 'Unknown error']);
+    res.status(200).json({ RspCode, Message });
+  } catch {
+    // VNPay retries IPN when processing fails; do not acknowledge an uncommitted update.
+    res.status(200).json({ RspCode: '99', Message: 'Unable to process notification' });
+  }
 });
 const vnPayReturn = asyncHandler(async (req, res) => {
-  const result = await paymentGatewayService.processVnPayCallback(req.query);
-  const returnUrl = process.env.FITZY_PAYMENT_RETURN_URL || 'fitzy://payment-result';
-  const orderNumber = encodeURIComponent(req.query.vnp_TxnRef || '');
-  const status = result.ok && req.query.vnp_ResponseCode === '00' ? 'success' : 'failed';
-  const appRedirectUrl = `${returnUrl}?gateway=vnpay&order=${orderNumber}&status=${status}`;
-
-  if (returnUrl.startsWith('http://') || returnUrl.startsWith('https://')) {
-    return res.redirect(302, appRedirectUrl);
+  const result = await paymentGatewayService.inspectVnPayReturn(req.query);
+  const returnUrl = new URL(process.env.FITZY_PAYMENT_RETURN_URL || 'fitzy://payment-result');
+  returnUrl.searchParams.set('gateway', 'vnpay');
+  returnUrl.searchParams.set('status', result.ok ? 'pending' : 'invalid');
+  // Never forward an order identifier from an unverified callback to the app.
+  returnUrl.searchParams.delete('orderId');
+  returnUrl.searchParams.delete('order');
+  returnUrl.searchParams.delete('responseCode');
+  if (result.ok) {
+    returnUrl.searchParams.set('orderId', result.order.id);
+    returnUrl.searchParams.set('order', result.order.orderNumber);
+    returnUrl.searchParams.set('responseCode', req.query.vnp_ResponseCode);
   }
-
-  const isSuccess = status === 'success';
-  const amountNumber = Number(req.query.vnp_Amount) / 100;
-  const formattedAmount = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amountNumber || 0);
-
-  res.removeHeader('Content-Security-Policy');
-  res.send(`<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kết Quả Thanh Toán · FITZY Store</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    body { background-color: #f8fafc; color: #1e293b; padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-    .card { width: 100%; max-width: 480px; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); padding: 32px 24px; text-align: center; border: 1px solid #e2e8f0; }
-    .icon-box { width: 64px; height: 64px; border-radius: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 16px; background: ${isSuccess ? '#ecfdf5' : '#fef2f2'}; color: ${isSuccess ? '#059669' : '#dc2626'}; }
-    h2 { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
-    .desc { font-size: 14px; color: #64748b; margin-bottom: 24px; line-height: 1.5; }
-    .info-list { background: #f8fafc; border-radius: 14px; padding: 16px; margin-bottom: 24px; font-size: 13px; text-align: left; }
-    .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
-    .info-row:last-child { margin-bottom: 0; }
-    .info-row span:first-child { color: #64748b; }
-    .info-row span:last-child { font-weight: 700; color: #0f172a; }
-    .btn { display: block; width: 100%; padding: 14px 20px; border-radius: 12px; font-size: 15px; font-weight: 700; text-decoration: none; text-align: center; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
-    .btn-primary { background: #005baa; color: #ffffff; }
-    .btn-primary:hover { background: #004d91; }
-    .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; margin-bottom: 0; }
-    .btn-secondary:hover { background: #e2e8f0; }
-    .notice { font-size: 11px; color: #94a3b8; margin-top: 16px; }
-  </style>
-  <script>
-    setTimeout(function() {
-      try { window.location.href = "${appRedirectUrl}"; } catch (e) {}
-    }, 400);
-  </script>
-</head>
-<body>
-  <div class="card">
-    <div class="icon-box">${isSuccess ? '✓' : '✕'}</div>
-    <h2>${isSuccess ? 'Thanh toán thành công qua VNPay' : 'Thanh toán chưa hoàn tất'}</h2>
-    <p class="desc">${isSuccess ? 'Đơn hàng của bạn đã được thanh toán và ghi nhận trên hệ thống.' : 'Giao dịch bị hủy hoặc không thành công. Bạn có thể thử lại từ ứng dụng.'}</p>
-    <div class="info-list">
-      <div class="info-row"><span>Mã đơn hàng:</span> <span>${req.query.vnp_TxnRef || '—'}</span></div>
-      <div class="info-row"><span>Số tiền:</span> <span>${formattedAmount}</span></div>
-      <div class="info-row"><span>Cổng thanh toán:</span> <span>VNPay Sandbox (${req.query.vnp_BankCode || 'NCB'})</span></div>
-      <div class="info-row"><span>Mã giao dịch:</span> <span>${req.query.vnp_TransactionNo || '—'}</span></div>
-      <div class="info-row"><span>Trạng thái:</span> <span style="color:${isSuccess ? '#059669' : '#dc2626'};">${isSuccess ? 'ĐÃ THANH TOÁN' : 'THẤT BẠI'}</span></div>
-    </div>
-    const adminWebUrl = process.env.ADMIN_URL || 'http://localhost:5173';
-    <a href="${appRedirectUrl}" class="btn btn-primary">Mở ứng dụng FITZY</a>
-    <a href="${adminWebUrl}" class="btn btn-secondary">Xem quản trị đơn hàng (Web Admin)</a>
-    <div class="notice">Hệ thống đang tự động điều hướng về ứng dụng FITZY…</div>
-  </div>
-</body>
-</html>`);
+  res.redirect(302, returnUrl.toString());
 });
+
 const vnPaySimulate = asyncHandler(async (req, res) => {
   const isValid = paymentGatewayService.verifyVnPayCallback(req.query);
   const { vnp_TxnRef, vnp_Amount, vnp_OrderInfo, vnp_ReturnUrl, vnp_TmnCode } = req.query;
@@ -244,6 +201,7 @@ const vnPaySimulateSubmit = asyncHandler(async (req, res) => {
   const returnUrl = req.body.vnp_ReturnUrl || process.env.VNPAY_RETURN_URL || `${req.protocol}://${req.get('host')}/api/payments/return/vnpay`;
   res.redirect(302, `${returnUrl}?${query}`);
 });
+
 const mine = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
   const [items, total] = await Promise.all([Order.find({ user: req.user.id }).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), Order.countDocuments({ user: req.user.id })]);

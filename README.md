@@ -84,6 +84,8 @@ The default admin email is `admin@fitzy.local`; the password is exactly the valu
 
 For checkout payments, set the provider variables in `FITZY-API/.env` using sandbox credentials first. Bank transfer requires `BANK_TRANSFER_BANK_NAME`, `BANK_TRANSFER_ACCOUNT_NAME`, and `BANK_TRANSFER_ACCOUNT_NUMBER`. MoMo and ZaloPay require their merchant keys plus public HTTPS IPN callback URLs. VNPay requires `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, a return URL, and its IPN URL registered in the VNPay merchant portal. Keep all provider secrets on the API server; never add them to Expo public variables. Production credentials should only replace sandbox credentials after provider onboarding and successful end-to-end verification.
 
+The [VNPay setup guide](docs/VNPAY.md) covers HTTPS callbacks, the installed app return flow, and sandbox verification. VNPay browser returns display the result; payment confirmation is applied through the verified IPN.
+
 ## Run the mobile app
 
 Create `FITZY-Mobile/.env` from `FITZY-Mobile/.env.example`, then set `EXPO_PUBLIC_API_URL` to the API URL reachable from the device. Expo inlines this public URL at build time; never put API keys or JWT secrets in `EXPO_PUBLIC_*` variables.

@@ -41,13 +41,17 @@ export default function CheckoutScreen({ navigation }) {
         const order = result.payload.order;
         dispatch(clearCart());
         if (result.payload.paymentUrl) {
-          navigation.replace('Orders');
+          if (paymentMethod === 'vnpay') {
+            navigation.replace('PaymentGateway', { orderId: order._id, paymentUrl: result.payload.paymentUrl });
+            return;
+          }
+          navigation.replace('OrderDetail', { orderId: order._id });
           try { await Linking.openURL(result.payload.paymentUrl); }
           catch { Alert.alert('Đã tạo đơn hàng', `Không thể mở cổng thanh toán. Mã đơn ${order.orderNumber} vẫn được lưu trong Đơn hàng.`); }
           return;
         }
         if (['momo', 'zalopay', 'vnpay'].includes(paymentMethod)) {
-          navigation.replace('Orders');
+          navigation.replace('OrderDetail', { orderId: order._id });
           Alert.alert('Đơn hàng đã được tạo', `Chưa nhận được liên kết thanh toán. Nếu cổng đã xử lý giao dịch, trạng thái đơn ${order.orderNumber} sẽ được đồng bộ khi bạn kiểm tra lại.`);
           return;
         }

@@ -6,6 +6,7 @@ const orderSchema = new mongoose.Schema({
   shipping: { recipient: String, phone: String, line1: String, ward: String, district: String, city: String }, paymentMethod: { type: String, enum: ['cod', 'bank_transfer', 'momo', 'zalopay', 'vnpay'], default: 'cod' },
   paymentStatus: { type: String, enum: ['unpaid', 'pending', 'paid', 'failed', 'refunded', 'expired'], default: 'unpaid' }, paymentExpiresAt: Date, providerTransactionId: { type: String, default: '' }, paymentUrl: { type: String, default: '' }, subtotal: { type: Number, required: true }, discount: { type: Number, default: 0 }, shippingFee: { type: Number, default: 0 }, total: { type: Number, required: true }, promotionCode: { type: String, default: '' },
   status: { type: String, enum: ['pending', 'confirmed', 'preparing', 'shipping', 'completed', 'cancelled', 'delivery_failed'], default: 'pending', index: true },
-  statusHistory: { type: [statusHistorySchema], default: [] }, cancelledAt: Date
+  statusHistory: { type: [statusHistorySchema], default: [] }, cancelledAt: Date,
+  gatewayTransactionId: { type: String, default: '' }, paidAt: Date
 }, { timestamps: true });
 module.exports = mongoose.model('Order', orderSchema);
